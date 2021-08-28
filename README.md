@@ -10,7 +10,8 @@
 - Train Your Tokenizer from HF Tutorials [[HF](notebooks/Train_your_tokenizer_from_HF_Tutorials.ipynb)]
 
 
-
+## [Tensorflow]
+- [IMDb Review Classification using CNN Tensorflow](notebooks/IMDb_Review_Classification_using_CNN_Tensorflow.ipynb)
 
 
 
