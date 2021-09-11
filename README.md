@@ -7,6 +7,7 @@
 - [AG News Multiclass Classification using DistilBERT model HF/TF Native](notebooks/AG_News_Classification_using_DistilBERT_Tensorflow.ipynb)
 - [Conll2003 NER Classification using DistilBERT model HF/TF Script](notebooks/Conll2003_NER_Classification_using_DistilBERT_HF_Tensorflow_Script.ipynb)
 - [ConllPP NER Classification using DistilBERT model HF/TF Script](notebooks/ConllPP_NER_Classification_using_DistilBERT_HF_Tensorflow_Script.ipynb)
+- [Seq2Seq Addition using LSTM Tensorflow](notebooks/Seq2Seq_Addition_using_LSTM_Tensorflow_.ipynb)
 
 
 #### [Pytorch]
