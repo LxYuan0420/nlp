@@ -25,6 +25,7 @@
 #### [spaCy]
 - [Extract Subject-Verb-Object Relation using spaCy Dependency Matcher](notebooks/Extract_Subject_Verb_Object_Relation_using_spaCy_DependencyMatcher.ipynb)
 - [Toxic Comment Multilabel Classification using spaCy v3 TextCategorizer](notebooks/Toxic_Comment_Multilabel_Classification_using_spaCy_v3_TextCategorizer.ipynb)
+- [Drug Name Detection using spaCy v3 NER](notebooks/Drug_Name_Detection_spaCy_v3_NER.ipynb)
 
 
 
