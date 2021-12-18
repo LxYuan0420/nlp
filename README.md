@@ -3,6 +3,7 @@
 
 #### [Tensorflow]
 - [IMDb Review Classification using CNN Tensorflow](notebooks/IMDb_Review_Classification_using_CNN_Tensorflow.ipynb)
+- [IMDB Review Classification using RNN Tensorflow](notebooks/IMDB_Review_Classification_using_RNN_Tensorflow.ipynb)
 - [Large Scale Multi Label Text Classification Tensorflow](notebooks/Large scale multi label text classification Tensorflow.ipynb)
 - [IMDB Review Classification using BERT Tensorflow](notebooks/IMDB_Review_Classification_using_BERT_Tensorflow.ipynb)
 - [IMDb Review Binary Classification using DistilBERT model HF/TF Trainer](notebooks/IMDb_Review_Classification_using_DistilBert_HF_Tensorflow_Trainer.ipynb)
