@@ -13,6 +13,7 @@
 - [Seq2Seq Addition using LSTM Tensorflow](notebooks/Seq2Seq_Addition_using_LSTM_Tensorflow_.ipynb)
 - [Text Extraction with BERT Tensorflow](notebooks/Text_Extraction_with_BERT.ipynb)
 - [Semantic Similarity using BERT HF Tensorflow](notebooks/Semantic_Similarity_using_BERT_HF_Tensorflow.ipynb)
+- [Text Generation with an RNN](notebooks/Text_Generation_with_an_RNN.ipynb)
 
 
 #### [Pytorch]
