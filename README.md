@@ -36,7 +36,5 @@
 - [Drug Name Detection using spaCy v3 NER](notebooks/Drug_Name_Detection_spaCy_v3_NER.ipynb)
 
 
-
-
-
-
+#### [DEMO]
+- [Chinese NER Model Demo with Gradio](notebooks/Chinese_NER_Model_Demo_with_Gradio.ipynb)
