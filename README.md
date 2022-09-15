@@ -28,6 +28,7 @@
 - [Train Your Tokenizer from HF Tutorials HF/PT Native](notebooks/Train_your_tokenizer_from_HF_Tutorials.ipynb)
 - [Classifying Names with a Character level RNN Pytorch](notebooks/Classifying_Names_with_a_Character_level_RNN_Pytorch.ipynb)
 - [Generating Names with a Character level RNN Pytorch](notebooks/Generating_Names_With_A_Character_level_RNN.ipynb)
+- [Fine-tuning BERT for Multilabel Classification task using Pytorch Trainer](https://github.com/LxYuan0420/nlp/blob/main/notebooks/Fine_tuning_BERT_for_multi_label_text_classification_pytorch_trainer.ipynb)
 
 
 #### [spaCy]
