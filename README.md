@@ -40,3 +40,6 @@
 
 #### [DEMO]
 - [Chinese NER Model Demo with Gradio](notebooks/Chinese_NER_Model_Demo_with_Gradio.ipynb)
+
+#### [OTHERS]
+- [Quickstart with BERTopic](notebooks/Quickstart_BERTopic.ipynb)
