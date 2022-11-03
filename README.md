@@ -29,6 +29,7 @@
 - [Classifying Names with a Character level RNN Pytorch](notebooks/Classifying_Names_with_a_Character_level_RNN_Pytorch.ipynb)
 - [Generating Names with a Character level RNN Pytorch](notebooks/Generating_Names_With_A_Character_level_RNN.ipynb)
 - [Fine-tuning BERT for Multilabel Classification task using Pytorch Trainer](https://github.com/LxYuan0420/nlp/blob/main/notebooks/Fine_tuning_BERT_for_multi_label_text_classification_pytorch_trainer.ipynb)
+- [Inference with MarkupLM for QA on webpages](notebooks/Inference_with_MarkupLM_for_question_answering_on_web_pages.ipynb)
 
 
 #### [spaCy]
