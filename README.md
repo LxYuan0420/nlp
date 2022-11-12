@@ -41,6 +41,9 @@
 #### [flair]
 - [HUNFLAIR-Tutorial-1-Tagging](notebooks/flair/HUNFLAIR_TUTORIAL_1_TAGGING.ipynb)
 
+#### [NLP with Transformers]
+- [NLP with Trasformers - 01 Introduction](notebooks/nlp_with_transformers/01_introduction.ipynb)
+
 #### [DEMO]
 - [Chinese NER Model Demo with Gradio](notebooks/Chinese_NER_Model_Demo_with_Gradio.ipynb)
 
