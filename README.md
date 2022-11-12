@@ -38,6 +38,8 @@
 - [Drug Name Detection using spaCy v3 NER](notebooks/Drug_Name_Detection_spaCy_v3_NER.ipynb)
 - [Quickstart with zhort](notebooks/Quickstart_with_zshot.ipynb) 
 
+#### [flair]
+- [HUNFLAIR-Tutorial-1-Tagging](notebooks/flair/HUNFLAIR_TUTORIAL_1_TAGGING.ipynb)
 
 #### [DEMO]
 - [Chinese NER Model Demo with Gradio](notebooks/Chinese_NER_Model_Demo_with_Gradio.ipynb)
