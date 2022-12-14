@@ -49,3 +49,4 @@
 
 #### [OTHERS]
 - [Quickstart with BERTopic](notebooks/Quickstart_BERTopic.ipynb)
+- [Reproducing_LUKE_experimental_results_Open_Entity](notebooks/Reproducing_LUKE_experimental_results_Open_Entity.ipynb)
