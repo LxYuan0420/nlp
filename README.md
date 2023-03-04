@@ -37,6 +37,7 @@
 - [Toxic Comment Multilabel Classification using spaCy v3 TextCategorizer](notebooks/Toxic_Comment_Multilabel_Classification_using_spaCy_v3_TextCategorizer.ipynb)
 - [Drug Name Detection using spaCy v3 NER](notebooks/Drug_Name_Detection_spaCy_v3_NER.ipynb)
 - [Quickstart with zhort](notebooks/Quickstart_with_zshot.ipynb) 
+- [spaCy Entity Linker](notebooks/Spacy_Entity_Linker_Demo.ipynb)
 
 #### [flair]
 - [HUNFLAIR-Tutorial-1-Tagging](notebooks/flair/HUNFLAIR_TUTORIAL_1_TAGGING.ipynb)
