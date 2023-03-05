@@ -51,3 +51,4 @@
 #### [OTHERS]
 - [Quickstart with BERTopic](notebooks/Quickstart_BERTopic.ipynb)
 - [Reproducing_LUKE_experimental_results_Open_Entity](notebooks/Reproducing_LUKE_experimental_results_Open_Entity.ipynb)
+- [Detect bad labels with cleanlab and pytorch](notebooks/Image_Classification_with_PyTorch_and_Cleanlab.ipynb)
