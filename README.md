@@ -41,6 +41,7 @@
 - [Drug Name Detection using spaCy v3 NER](notebooks/Drug_Name_Detection_spaCy_v3_NER.ipynb)
 - [Quickstart with zhort](notebooks/Quickstart_with_zshot.ipynb) 
 - [spaCy Entity Linker](notebooks/Spacy_Entity_Linker_Demo.ipynb)
+- [Chinese Legal Text Classification with spaCy](notebooks/Chinese_Legal_NLP_Text_Classification_with_spaCy.ipynb)
 
 #### [flair]
 - [HUNFLAIR-Tutorial-1-Tagging](notebooks/flair/HUNFLAIR_TUTORIAL_1_TAGGING.ipynb)
