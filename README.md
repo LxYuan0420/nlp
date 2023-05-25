@@ -57,3 +57,4 @@
 - [Reproducing_LUKE_experimental_results_Open_Entity](notebooks/Reproducing_LUKE_experimental_results_Open_Entity.ipynb)
 - [Detect bad labels with cleanlab and pytorch](notebooks/Image_Classification_with_PyTorch_and_Cleanlab.ipynb)
 - [Huggingface int8 demo](notebooks/HuggingFace_int8_demo.ipynb)
+- [DocsQA with LangChain and OpenAI](notebooks/DocQA_with_PDFs_with_LangChain_and_OpenAI.ipynb)
