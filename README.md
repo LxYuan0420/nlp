@@ -34,6 +34,7 @@
 - [Finetuning DistilGPT-2 Language Model on Wikitext Dataset](notebooks/Fine_tune_DistilGPT2_language_model_on_wikitext_dataset.ipynb)
 - [Finetuning DistilGPT-2 Language Model on Combined Wiki Dataset](notebooks/Finetune_DistilGPT2_language_model_combined_wikitext_dataset.ipynb)
 - [Distillation using Zero-shot pipeline with mDistilBERT Student Model](notebooks/Distilling_Zero_Shot_multilingual_distilbert_sentiments_student.ipynb)
+- [DistillBERT for Banking Intent Classification](notebooks/distillbert-intent-classification-banking.ipynb)
 
 #### [spaCy]
 - [Extract Subject-Verb-Object Relation using spaCy Dependency Matcher](notebooks/Extract_Subject_Verb_Object_Relation_using_spaCy_DependencyMatcher.ipynb)
