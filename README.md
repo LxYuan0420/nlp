@@ -60,3 +60,4 @@
 - [Huggingface int8 demo](notebooks/HuggingFace_int8_demo.ipynb)
 - [DocsQA with LangChain and OpenAI](notebooks/DocQA_with_PDFs_with_LangChain_and_OpenAI.ipynb)
 - [Evaluator from Huggingface](notebooks/Evaluator_from_Huggingface.ipynb)
+- [Text Classification with Transformers and Datalab](notebooks/Text_Data_Cleaning_using_cleanlab_and_SentenceTransformer.ipynb)
