@@ -44,11 +44,6 @@
 - [spaCy Entity Linker](notebooks/Spacy_Entity_Linker_Demo.ipynb)
 - [Chinese Legal Text Classification with spaCy](notebooks/Chinese_Legal_NLP_Text_Classification_with_spaCy.ipynb)
 
-#### [flair]
-- [HUNFLAIR-Tutorial-1-Tagging](notebooks/flair/HUNFLAIR_TUTORIAL_1_TAGGING.ipynb)
-
-#### [NLP with Transformers]
-- [NLP with Trasformers - 01 Introduction](notebooks/nlp_with_transformers/01_introduction.ipynb)
 
 #### [DEMO]
 - [Chinese NER Model Demo with Gradio](notebooks/Chinese_NER_Model_Demo_with_Gradio.ipynb)
@@ -61,3 +56,7 @@
 - [DocsQA with LangChain and OpenAI](notebooks/DocQA_with_PDFs_with_LangChain_and_OpenAI.ipynb)
 - [Evaluator from Huggingface](notebooks/Evaluator_from_Huggingface.ipynb)
 - [Text Classification with Transformers and Datalab](notebooks/Text_Data_Cleaning_using_cleanlab_and_SentenceTransformer.ipynb)
+
+
+#### [Computer Vision]
+- [ViT X-ray Pneumonia Classification Notebook](notebooks/ViT-xray-classification.ipynb)
