@@ -37,6 +37,8 @@
 - [DistillBERT for Banking Intent Classification](notebooks/distillbert-intent-classification-banking.ipynb)
 - [Finetuning DistilGPT-2 Language Model on Combined Finance Dataset](notebooks/finetune_distilgpt2_language_model_on_finance_dataset.ipynb)
 - [Finetuning DistilBART Language Model on Combined Summarisation Dataset](notebooks/distilbart-finetune-summarisation.ipynb)
+- [SetFit Text Classification Example](notebooks/setfit-text-classification-example.ipynb)
+
 
 #### [spaCy]
 - [Extract Subject-Verb-Object Relation using spaCy Dependency Matcher](notebooks/Extract_Subject_Verb_Object_Relation_using_spaCy_DependencyMatcher.ipynb)
