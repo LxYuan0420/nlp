@@ -38,6 +38,7 @@
 - [Finetuning DistilGPT-2 Language Model on Combined Finance Dataset](notebooks/finetune_distilgpt2_language_model_on_finance_dataset.ipynb)
 - [Finetuning DistilBART Language Model on Combined Summarisation Dataset](notebooks/distilbart-finetune-summarisation.ipynb)
 - [SetFit Text Classification Example](notebooks/setfit-text-classification-example.ipynb)
+- [SpanMarker NER Classification Example](scripts/spanmarker_train.py)
 
 
 #### [spaCy]
