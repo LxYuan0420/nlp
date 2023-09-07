@@ -39,6 +39,7 @@
 - [Finetuning DistilBART Language Model on Combined Summarisation Dataset](notebooks/distilbart-finetune-summarisation.ipynb)
 - [SetFit Text Classification Example](notebooks/setfit-text-classification-example.ipynb)
 - [SpanMarker NER Classification Example](scripts/spanmarker_train.py)
+- [Reuters-21578 MultiLabel Classification using Transformer Trainer API](notebooks/transformer_reuters.ipynb)
 
 
 #### [spaCy]
