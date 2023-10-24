@@ -53,6 +53,7 @@
 
 #### [DEMO]
 - [Chinese NER Model Demo with Gradio](notebooks/Chinese_NER_Model_Demo_with_Gradio.ipynb)
+- [Microsoft Phi1.5 Chatbot with Gradio](notebooks/gradio_microsoft_phi15.ipynb)
 
 #### [OTHERS]
 - [Quickstart with BERTopic](notebooks/Quickstart_BERTopic.ipynb)
