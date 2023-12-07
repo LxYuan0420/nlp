@@ -67,3 +67,7 @@
 
 #### [Computer Vision]
 - [ViT X-ray Pneumonia Classification Notebook](notebooks/ViT-xray-classification.ipynb)
+
+
+#### [Speech]
+- [Inference with Text-to-Speech VIT model](notebooks/exp_text_to_speech_vits.ipynb)
