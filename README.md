@@ -64,7 +64,7 @@
 - [DocsQA with LangChain and OpenAI](notebooks/DocQA_with_PDFs_with_LangChain_and_OpenAI.ipynb)
 - [Evaluator from Huggingface](notebooks/Evaluator_from_Huggingface.ipynb)
 - [Text Classification with Transformers and Datalab](notebooks/Text_Data_Cleaning_using_cleanlab_and_SentenceTransformer.ipynb)
-- [RAG with RAGatouille](notebook/RAG_with_RAGatouille.ipynb)
+- [RAG with RAGatouille](notebooks/RAG_with_RAGatouille.ipynb)
 
 
 #### [Computer Vision]
