@@ -41,6 +41,7 @@
 - [SpanMarker NER Classification Example](scripts/spanmarker_train.py)
 - [Reuters-21578 MultiLabel Classification using Transformer Trainer API](notebooks/transformer_reuters.ipynb)
 - [Topic Modelling with LLMs (OpenHermes_2_5_Mistral_7B_GGUF)](notebooks/Topic_Modeling_with_Quantized_LLMs_(OpenHermes_2_5_Mistral_7B_GGUF).ipynb)
+- [Inference Llama-2-7B-Chat-AWQ Notebook](notebooks/Inference_Llama_2_7B_Chat_using_AWQ.ipynb)
 
 
 #### [spaCy]
