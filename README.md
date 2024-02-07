@@ -42,6 +42,7 @@
 - [Reuters-21578 MultiLabel Classification using Transformer Trainer API](notebooks/transformer_reuters.ipynb)
 - [Topic Modelling with LLMs (OpenHermes_2_5_Mistral_7B_GGUF)](notebooks/Topic_Modeling_with_Quantized_LLMs_(OpenHermes_2_5_Mistral_7B_GGUF).ipynb)
 - [Inference Llama-2-7B-Chat-AWQ Notebook](notebooks/Inference_Llama_2_7B_Chat_using_AWQ.ipynb)
+- [4-bit Inferencing lxyuan/AeolusBlend-7B-slerp](notebooks/Inference_4bit_AeolusBlend.ipynb)
 
 
 #### [spaCy]
