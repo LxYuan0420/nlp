@@ -43,7 +43,7 @@
 - [Topic Modelling with LLMs (OpenHermes_2_5_Mistral_7B_GGUF)](notebooks/Topic_Modeling_with_Quantized_LLMs_(OpenHermes_2_5_Mistral_7B_GGUF).ipynb)
 - [Inference Llama-2-7B-Chat-AWQ Notebook](notebooks/Inference_Llama_2_7B_Chat_using_AWQ.ipynb)
 - [4-bit Inferencing lxyuan/AeolusBlend-7B-slerp](notebooks/Inference_4bit_AeolusBlend.ipynb)
-
+- [2-bit Inferencing with AQLM](notebooks/Inference_with_AQLM_Transformers.ipynb)
 
 #### [spaCy]
 - [Extract Subject-Verb-Object Relation using spaCy Dependency Matcher](notebooks/Extract_Subject_Verb_Object_Relation_using_spaCy_DependencyMatcher.ipynb)
