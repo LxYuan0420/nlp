@@ -68,6 +68,7 @@
 - [Evaluator from Huggingface](notebooks/Evaluator_from_Huggingface.ipynb)
 - [Text Classification with Transformers and Datalab](notebooks/Text_Data_Cleaning_using_cleanlab_and_SentenceTransformer.ipynb)
 - [RAG with RAGatouille](notebooks/RAG_with_RAGatouille.ipynb)
+- [Structural Information Extraction with NuExtract-large](notebooks/Inference_with_NuExtract_large_for_Structural_Information_Extraction.ipynb)
 
 
 #### [Computer Vision]
