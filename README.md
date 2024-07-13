@@ -45,6 +45,7 @@
 - [4-bit Inferencing lxyuan/AeolusBlend-7B-slerp](notebooks/Inference_4bit_AeolusBlend.ipynb)
 - [From Data to Diagrams: Learn Knowledge Graph Basics with AeolusBlend LLM](notebooks/Inference_AeolusBlend_KnowledgeGraph.ipynb)
 - [2-bit Inferencing with AQLM](notebooks/Inference_with_AQLM_Transformers.ipynb)
+- [Finetuning Sentence Transformer Model from DistilBERT on NLI Triplet Dataset](notebooks/finetuning_distilbert_base_uncased_nli_triplet.ipynb)
 
 #### [spaCy]
 - [Extract Subject-Verb-Object Relation using spaCy Dependency Matcher](notebooks/Extract_Subject_Verb_Object_Relation_using_spaCy_DependencyMatcher.ipynb)
