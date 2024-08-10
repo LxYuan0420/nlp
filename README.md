@@ -47,6 +47,7 @@
 - [2-bit Inferencing with AQLM](notebooks/Inference_with_AQLM_Transformers.ipynb)
 - [Finetuning Sentence Transformer Model from DistilBERT on NLI Triplet Dataset](notebooks/finetuning_distilbert_base_uncased_nli_triplet.ipynb)
 - [Finetuning Sentence Transformer Model from DistilBERT with multi dataset](notebooks/finetuning-distilbert-base-uncased-multi-dataset.ipynb)
+- [Finetuning Sentence Transformer Model using Matryoshka Loss](notebooks/Finetuning_Embedding_Model_Matryoshka_768_64_NLI.ipynb)
 
 #### [spaCy]
 - [Extract Subject-Verb-Object Relation using spaCy Dependency Matcher](notebooks/Extract_Subject_Verb_Object_Relation_using_spaCy_DependencyMatcher.ipynb)
