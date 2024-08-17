@@ -73,7 +73,7 @@
 - [RAG with RAGatouille](notebooks/RAG_with_RAGatouille.ipynb)
 - [Structural Information Extraction with NuExtract-large](notebooks/Inference_with_NuExtract_large_for_Structural_Information_Extraction.ipynb)
 - [Experimenting Torchchat in Colab](notebooks/Experimenting_with_TorchChat_in_Colab_.ipynb)
-
+- [Unstructured.io Introductio Notebook](notebooks/Unstructured_Quick_Tour.ipynb)
 
 #### [Computer Vision]
 - [ViT X-ray Pneumonia Classification Notebook](notebooks/ViT-xray-classification.ipynb)
