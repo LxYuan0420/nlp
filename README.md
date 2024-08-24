@@ -81,3 +81,4 @@
 
 #### [Speech]
 - [Inference with Text-to-Speech VIT model](notebooks/exp_text_to_speech_vits.ipynb)
+- [viXTTS_Customization_Introducing_Random_Pauses_and_Fading_Transitions.ipynb](notebooks/viXTTS_Customization_Introducing_Random_Pauses_and_Fading_Transitions.ipynb)
