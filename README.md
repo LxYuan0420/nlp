@@ -74,6 +74,7 @@
 - [Structural Information Extraction with NuExtract-large](notebooks/Inference_with_NuExtract_large_for_Structural_Information_Extraction.ipynb)
 - [Experimenting Torchchat in Colab](notebooks/Experimenting_with_TorchChat_in_Colab_.ipynb)
 - [Unstructured.io Introductio Notebook](notebooks/Unstructured_Quick_Tour.ipynb)
+- [Text deduplication using model2vec](notebooks/Semantic_deduplication_using_model2vec.ipynb)
 
 #### [Computer Vision]
 - [ViT X-ray Pneumonia Classification Notebook](notebooks/ViT-xray-classification.ipynb)
