@@ -78,6 +78,8 @@
 - [AutoGen Weather Assistant Example](scripts/basic_weather_example.py)
 - [AutoGen Bank Assistant Example](scripts/bank_chatbot_example.py)
 - [Surya - Document OCR Toolkit](scripts/surya_gui.py) [SS1](docs/Screenshot-2025-03-10-at-12.42.16 PM.png) [SS2](docs/Screenshot-2025-03-10-at-12.42.55 PM.png) [SS3](docs/Screenshot-2025-03-10-at-12.44.18 PM.png) [SS4](docs/Screenshot-2025-03-10-at-12.45.32 PM.png) [SS5](docs/Screenshot-2025-03-10-at-12.48.45 PM.png)
+- [Routing Banking Example - Openai Agent SDK](scripts/routing_agent_banking_example.py)
+
 
 #### [Computer Vision]
 - [ViT X-ray Pneumonia Classification Notebook](notebooks/ViT-xray-classification.ipynb)
