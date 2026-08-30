@@ -7,7 +7,6 @@
 #   "huggingface-hub>=1.4.0,<2",
 #   "sentencepiece>=0.2.1,<1",
 #   "tensorboard==2.20.0",
-#   "trackio==0.37.0",
 #   "transformers==5.16.1",
 #   "trl==1.12.0",
 # ]
@@ -20,8 +19,8 @@ This tutorial experiment has one deliberately visible pipeline:
    a native FunctionGemma assistant tool call.
 2. Prepare the model: load ``google/functiongemma-270m-it`` with FP32 master
    weights and inspect its rendered tool-calling prompt.
-3. Configure training: build a TRL ``SFTTrainer`` with deterministic settings,
-   TensorBoard logs, and local Trackio tracking.
+3. Configure training: build a TRL ``SFTTrainer`` with deterministic settings
+   and TensorBoard logs.
 4. Evaluate: compare exact generated tool selection before and after training.
 5. Save and publish: write reproducibility artifacts, generate the model card
    from recorded metrics, and publish the complete result to Hugging Face.
@@ -70,7 +69,6 @@ from pathlib import Path
 from typing import Any
 
 import torch
-import trackio
 from datasets import Dataset, DatasetDict, concatenate_datasets, load_dataset
 from huggingface_hub import HfApi
 from transformers import (
@@ -85,9 +83,6 @@ from trl import SFTConfig, SFTTrainer
 BASE_MODEL_ID = "google/functiongemma-270m-it"
 DATASET_ID = "mteb/banking77"
 MODEL_REPO_NAME = "FunctionGemma-270M-banking77-router"
-TRACKIO_SPACE_NAME = "functiongemma-banking77-trackio"
-TRACKIO_BUCKET_NAME = "functiongemma-banking77-trackio-data"
-TRACKIO_PROJECT = "functiongemma-banking77-routing-full-sft"
 DEFAULT_OUTPUT_DIR = Path("functiongemma-banking77-router")
 REMOTE_TOKEN_PATH = Path("/content/hf_token")
 LOCAL_TOKEN_PATH = Path.home() / ".cache" / "huggingface" / "token"
@@ -684,11 +679,11 @@ class FunctionGemmaExperiment:
 
         Returns:
             An ``SFTTrainer`` configured for full-sequence ``chunked_nll``.
-            It logs to TensorBoard and local Trackio, evaluates once per epoch,
-            and saves at most one intermediate checkpoint.
+            It logs to TensorBoard, evaluates once per epoch, and saves at most
+            one intermediate checkpoint.
         """
 
-        print("\n=== 3. CONFIGURE TRAINING AND TRACKING ===")
+        print("\n=== 3. CONFIGURE TRAINING AND LOGGING ===")
         run_name = (
             f"functiongemma-banking77-{datetime.now(UTC).strftime('%Y%m%d-%H%M%S')}"
         )
@@ -730,10 +725,7 @@ class FunctionGemmaExperiment:
             logging_strategy="steps",
             logging_steps=LOGGING_STEPS,
             logging_first_step=True,
-            report_to=["tensorboard", "trackio"],
-            project=TRACKIO_PROJECT,
-            trackio_space_id=None,
-            trackio_static_space_id=False,
+            report_to=["tensorboard"],
             seed=self.config.seed,
             data_seed=self.config.seed,
         )
@@ -742,7 +734,7 @@ class FunctionGemmaExperiment:
             f"effective_batch={TRAIN_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS}, "
             f"warmup_steps={warmup_steps}, loss=chunked_nll."
         )
-        print(f"Logs: TensorBoard={self.tensorboard_dir}, Trackio={TRACKIO_PROJECT}.")
+        print(f"TensorBoard logs: {self.tensorboard_dir}")
         return SFTTrainer(
             model=model,
             args=training_args,
@@ -808,12 +800,8 @@ class FunctionGemmaExperiment:
             "baseline_predictions": baseline_predictions,
             "final_predictions": final_predictions,
             "versions": package_versions(),
-            "tracking": {
-                "tensorboard_dir": str(self.tensorboard_dir),
-                "trackio_project": TRACKIO_PROJECT,
-            },
+            "tracking": {"tensorboard_dir": str(self.tensorboard_dir)},
             "model_repo_id": None,
-            "trackio_space_id": None,
         }
         metrics_path = self.output_dir / "training_metrics.json"
         metrics_path.write_text(
@@ -831,8 +819,8 @@ class FunctionGemmaExperiment:
                 ``save_artifacts``.
 
         Returns:
-            Verified model and Trackio URLs when ``config.publish`` is true;
-            otherwise ``None`` after leaving all artifacts local.
+            Verified model URL when ``config.publish`` is true; otherwise
+            ``None`` after leaving all artifacts local.
         """
 
         if not self.config.publish:
@@ -841,16 +829,14 @@ class FunctionGemmaExperiment:
 
         result = HubExperimentPublisher(self.output_dir).publish(metrics_path)
         print(f"Model: {result.model_url}")
-        print(f"Trackio dashboard: {result.trackio_url}")
         return result
 
 
 @dataclass(frozen=True)
 class PublicationResult:
-    """Verified Hugging Face destinations for a completed experiment."""
+    """Verified Hugging Face destination for a completed experiment."""
 
     model_url: str
-    trackio_url: str
 
 
 class ModelCardRenderer:
@@ -861,7 +847,6 @@ class ModelCardRenderer:
         cls,
         metrics: dict[str, Any],
         model_repo_id: str,
-        trackio_space_id: str,
     ) -> str:
         """Return a complete model card containing only recorded claims."""
 
@@ -1006,9 +991,9 @@ model becomes more confident on repeated training rows without improving
 equally on unseen rows. Cross-entropy can increase from a few confidently wrong
 tokens even when average token accuracy changes little.
 
-See the [Trackio dashboard](https://huggingface.co/spaces/{trackio_space_id})
-for the training curves. TensorBoard events, `trainer_state.json`, and
-`training_metrics.json` are included in this repository.
+TensorBoard event files, `trainer_state.json`, and `training_metrics.json` are
+included in this repository for inspecting the training curves and recorded
+results.
 
 ## Training configuration
 
@@ -1189,24 +1174,21 @@ class HubExperimentPublisher:
         self._validate_local_artifacts(resolved_metrics_path)
         username = self._authenticated_username()
         model_repo_id = f"{username}/{MODEL_REPO_NAME}"
-        trackio_space_id = f"{username}/{TRACKIO_SPACE_NAME}"
         metrics = json.loads(resolved_metrics_path.read_text(encoding="utf-8"))
         metrics["model_repo_id"] = model_repo_id
-        metrics["trackio_space_id"] = trackio_space_id
         resolved_metrics_path.write_text(
             json.dumps(metrics, indent=2, sort_keys=True) + "\n",
             encoding="utf-8",
         )
         (self.output_dir / "README.md").write_text(
-            ModelCardRenderer.render(metrics, model_repo_id, trackio_space_id),
+            ModelCardRenderer.render(metrics, model_repo_id),
             encoding="utf-8",
         )
 
         print("\n=== 8. GENERATE MODEL CARD, PUBLISH, AND VERIFY ===")
-        trackio_url = self._sync_trackio(trackio_space_id, username)
         model_url = self._upload_model(model_repo_id)
-        self._verify_remote(model_repo_id, trackio_space_id)
-        return PublicationResult(model_url=model_url, trackio_url=trackio_url)
+        self._verify_remote(model_repo_id)
+        return PublicationResult(model_url=model_url)
 
     def _validate_local_artifacts(self, metrics_path: Path) -> None:
         """Fail before remote writes when a completed run is unavailable."""
@@ -1230,19 +1212,6 @@ class HubExperimentPublisher:
         print(f"Authenticated Hugging Face user: {username}")
         return username
 
-    @staticmethod
-    def _sync_trackio(trackio_space_id: str, username: str) -> str:
-        """Persist the local Trackio run in a free static Space."""
-
-        synced_space_id = trackio.sync(
-            project=TRACKIO_PROJECT,
-            space_id=trackio_space_id,
-            bucket_id=f"{username}/{TRACKIO_BUCKET_NAME}",
-            force=True,
-            sdk="static",
-        )
-        return f"https://huggingface.co/spaces/{synced_space_id}"
-
     def _upload_model(self, model_repo_id: str) -> str:
         """Upload final artifacts, including the newly generated README."""
 
@@ -1256,19 +1225,14 @@ class HubExperimentPublisher:
         )
         return f"https://huggingface.co/{model_repo_id}"
 
-    def _verify_remote(self, model_repo_id: str, trackio_space_id: str) -> None:
-        """Check required model files and the static Trackio Space."""
+    def _verify_remote(self, model_repo_id: str) -> None:
+        """Check that the published model contains every required artifact."""
 
         remote_files = set(self.api.list_repo_files(model_repo_id, repo_type="model"))
         missing = sorted(set(REQUIRED_REMOTE_ARTIFACTS).difference(remote_files))
         if missing:
             raise RuntimeError("Published model is missing: " + ", ".join(missing))
-        space = self.api.space_info(trackio_space_id)
-        if space.sdk != "static":
-            raise RuntimeError(
-                f"Expected a static Trackio Space, found sdk={space.sdk!r}."
-            )
-        print("Verified model files and static Trackio Space on Hugging Face.")
+        print("Verified required model files on Hugging Face.")
 
 
 def load_hf_token() -> str:
@@ -1301,7 +1265,6 @@ def package_versions() -> dict[str, str]:
         "datasets",
         "trl",
         "tensorboard",
-        "trackio",
     )
     return {name: importlib.metadata.version(name) for name in packages}
 
@@ -1332,7 +1295,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--no-push-to-hub",
         action="store_true",
-        help="Keep model artifacts and Trackio data local.",
+        help="Keep model artifacts local and skip Hugging Face publication.",
     )
     parser.add_argument(
         "--validate-only",
@@ -1373,7 +1336,6 @@ def main() -> None:
     if args.publish_only:
         result = HubExperimentPublisher(output_dir).publish()
         print(f"Model: {result.model_url}")
-        print(f"Trackio dashboard: {result.trackio_url}")
         return
 
     config = ExperimentConfig(
