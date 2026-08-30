@@ -23,8 +23,8 @@ This tutorial experiment has one deliberately visible pipeline:
 3. Configure training: build a TRL ``SFTTrainer`` with deterministic settings,
    TensorBoard logs, and local Trackio tracking.
 4. Evaluate: compare exact generated tool selection before and after training.
-5. Save and publish: write reproducibility artifacts and, by default, delegate
-   Hub publication to the separate publication script.
+5. Save and publish: write reproducibility artifacts, generate the model card
+   from recorded metrics, and publish the complete result to Hugging Face.
 
 Prerequisites:
 
@@ -53,9 +53,7 @@ Recover publication without retraining:
         --publish-only
 
 The default run uses 800 training rows, 200 held-out rows, and four epochs. Its
-verified free-T4 reference run took about 18 minutes for training. The model
-card is intentionally maintained outside this training module at
-``model_cards/functiongemma-banking77-router/README.md``.
+verified free-T4 reference run took about 18 minutes for training.
 """
 
 from __future__ import annotations
@@ -64,6 +62,7 @@ import argparse
 import importlib.metadata
 import json
 import math
+import os
 import re
 from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
@@ -71,7 +70,9 @@ from pathlib import Path
 from typing import Any
 
 import torch
+import trackio
 from datasets import Dataset, DatasetDict, concatenate_datasets, load_dataset
+from huggingface_hub import HfApi
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
@@ -83,8 +84,20 @@ from trl import SFTConfig, SFTTrainer
 
 BASE_MODEL_ID = "google/functiongemma-270m-it"
 DATASET_ID = "mteb/banking77"
+MODEL_REPO_NAME = "FunctionGemma-270M-banking77-router"
+TRACKIO_SPACE_NAME = "functiongemma-banking77-trackio"
+TRACKIO_BUCKET_NAME = "functiongemma-banking77-trackio-data"
 TRACKIO_PROJECT = "functiongemma-banking77-routing-full-sft"
 DEFAULT_OUTPUT_DIR = Path("functiongemma-banking77-router")
+REMOTE_TOKEN_PATH = Path("/content/hf_token")
+LOCAL_TOKEN_PATH = Path.home() / ".cache" / "huggingface" / "token"
+TRL_LOSS_DOCUMENTATION = "https://huggingface.co/docs/trl/v1.12.0/en/sft_trainer"
+REQUIRED_LOCAL_ARTIFACTS = (
+    "model.safetensors",
+    "trainer_state.json",
+    "training_metrics.json",
+)
+REQUIRED_REMOTE_ARTIFACTS = REQUIRED_LOCAL_ARTIFACTS + ("README.md",)
 
 INTENT_DESCRIPTIONS = {
     "card_arrival": "Handle questions about when a newly ordered card will arrive.",
@@ -420,9 +433,7 @@ class FunctionGemmaExperiment:
 
         self._validate_training_environment()
         if self.config.publish:
-            from publish_functiongemma_banking77 import validate_hf_access
-
-            username = validate_hf_access()
+            username = HubExperimentPublisher.validate_access()
             print(f"Publication namespace: {username}")
         self.output_dir.mkdir(parents=True, exist_ok=True)
         trainer = self._build_trainer(model, tokenizer, dataset)
@@ -580,9 +591,13 @@ class FunctionGemmaExperiment:
             optim="adamw_torch_fused",
             max_length=MAX_SEQUENCE_LENGTH,
             packing=False,
+            # This is a conversational language-modeling dataset, so these
+            # settings intentionally supervise the full rendered sequence.
             completion_only_loss=False,
             assistant_only_loss=False,
-            loss_type="nll",
+            # TRL 1.12 defaults to chunked_nll. Pin it explicitly so a future
+            # library default cannot silently change the experiment objective.
+            loss_type="chunked_nll",
             gradient_checkpointing=False,
             fp16=True,
             bf16=False,
@@ -603,7 +618,7 @@ class FunctionGemmaExperiment:
         print(f"Learning rate: {LEARNING_RATE}")
         print(f"Warmup: {warmup_steps} steps ({WARMUP_FRACTION:.0%} of the run)")
         print(f"Effective batch size: {TRAIN_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS}")
-        print("Loss: next-token cross-entropy over every non-padding token")
+        print("Loss: chunked NLL (next-token cross-entropy), excluding padding")
         print(f"TensorBoard directory: {self.tensorboard_dir}")
         print(f"Trackio project: {TRACKIO_PROJECT} (local during training)")
         return SFTTrainer(
@@ -638,7 +653,8 @@ class FunctionGemmaExperiment:
             "selected_intents": list(SELECTED_INTENTS),
             "config": asdict(self.config),
             "training_contract": {
-                "objective": "causal language-model next-token cross-entropy",
+                "objective": "chunked_nll",
+                "objective_math": "causal language-model next-token cross-entropy",
                 "loss_tokens": "all non-padding tokens in each rendered conversation",
                 "task_metric": "exact first generated tool-name accuracy",
                 "warmup_steps": trainer.args.warmup_steps,
@@ -668,20 +684,460 @@ class FunctionGemmaExperiment:
         return metrics_path
 
     def _publish_if_requested(self, metrics_path: Path) -> None:
-        """Delegate the one-off Hub concerns to the publication module."""
+        """Generate the card from metrics and publish the completed experiment."""
 
         if not self.config.publish:
             print("Publication disabled with --no-push-to-hub.")
             return
 
-        from publish_functiongemma_banking77 import publish_completed_experiment
-
-        result = publish_completed_experiment(
-            output_dir=self.output_dir,
-            metrics_path=metrics_path,
-        )
+        result = HubExperimentPublisher(self.output_dir).publish(metrics_path)
         print(f"Model: {result.model_url}")
         print(f"Trackio dashboard: {result.trackio_url}")
+
+
+@dataclass(frozen=True)
+class PublicationResult:
+    """Verified Hugging Face destinations for a completed experiment."""
+
+    model_url: str
+    trackio_url: str
+
+
+class ModelCardRenderer:
+    """Render a data-driven Hub README from completed experiment metrics."""
+
+    @classmethod
+    def render(
+        cls,
+        metrics: dict[str, Any],
+        model_repo_id: str,
+        trackio_space_id: str,
+    ) -> str:
+        """Return a complete model card containing only recorded claims."""
+
+        config = metrics["config"]
+        train_metrics = metrics["train_metrics"]
+        eval_metrics = metrics["eval_metrics"]
+        versions = metrics["versions"]
+        baseline_accuracy = float(metrics["baseline_tool_accuracy"])
+        final_accuracy = float(metrics["final_tool_accuracy"])
+        examples = cls._example_rows(metrics["final_predictions"])
+        tools_table = "\n".join(
+            f"| `{tool_name(intent)}` | {description} |"
+            for intent, description in INTENT_DESCRIPTIONS.items()
+        )
+        versions_list = "\n".join(
+            f"- `{name}=={version}`" for name, version in versions.items()
+        )
+        example_table = "\n".join(
+            f"| {cls._markdown_code(message)} | `{name}` |"
+            for message, name, _ in examples
+        )
+        example_input, _, example_output = examples[0]
+        warmup_description = cls._warmup_description(metrics)
+
+        return f"""---
+base_model: {BASE_MODEL_ID}
+library_name: transformers
+license: gemma
+language:
+- en
+datasets:
+- {DATASET_ID}
+pipeline_tag: text-generation
+tags:
+- trl
+- function-calling
+- intent-classification
+- banking77
+model-index:
+- name: {MODEL_REPO_NAME}
+  results:
+  - task:
+      type: text-generation
+      name: Banking tool routing
+    dataset:
+      name: BANKING77 ten-intent held-out slice
+      type: {DATASET_ID}
+      split: test
+    metrics:
+    - type: accuracy
+      value: {final_accuracy:.4f}
+      name: Exact first-tool accuracy
+---
+
+# FunctionGemma 270M BANKING77 Router
+
+This is a full fine-tune of
+[`{BASE_MODEL_ID}`](https://huggingface.co/{BASE_MODEL_ID}) that turns an
+English banking request into one of ten structured support tool calls. It is a
+learning experiment, not a production banking system.
+
+## What was trained?
+
+BANKING77 is normally a classification dataset with `text`, integer `label`,
+and human-readable `label_text` fields. This experiment does not add a
+classification head. It converts `label_text` into the expected assistant tool
+call and fine-tunes FunctionGemma to generate that native structure.
+
+```json
+{{
+  "text": "My card is gone. I think it was stolen.",
+  "label_text": "lost_or_stolen_card"
+}}
+```
+
+becomes a target call to `handle_lost_or_stolen_card`.
+
+## Tool schema
+
+Every tool receives the original customer message. One complete schema is:
+
+```json
+{json.dumps(TOOLS[5], indent=2)}
+```
+
+| Function | Intended request |
+| --- | --- |
+{tools_table}
+
+## Use the model
+
+```python
+{cls._usage_code(model_repo_id)}
+```
+
+The model selects a call; it does not execute the tool. Validate arguments and
+dispatch through an explicit allow-listed handler map.
+
+## Observed held-out examples
+
+| Customer input | First generated tool |
+| --- | --- |
+{example_table}
+
+```text
+Input:  {example_input}
+Output: {example_output}
+```
+
+## Loss function
+
+This run uses TRL `SFTTrainer` with `loss_type="chunked_nll"`. This is the
+standard causal-language-model next-token negative log-likelihood, or
+cross-entropy, computed in memory-saving chunks:
+
+```text
+loss = mean(-log P(correct next token | previous tokens))
+```
+
+`assistant_only_loss=False`, and this is a conversational language-modeling
+dataset rather than a prompt-completion dataset. Therefore every non-padding
+token in the rendered developer prompt, tool declarations, user message, and
+assistant call contributes. Padding labels use `-100` and are ignored. Exact
+generated tool accuracy is a separate application metric and is not the
+differentiable loss. See the
+[TRL 1.12 SFT documentation]({TRL_LOSS_DOCUMENTATION}).
+
+## Results
+
+| Metric | Value |
+| --- | ---: |
+| Base-model exact first-tool accuracy | {baseline_accuracy:.2%} |
+| Fine-tuned exact first-tool accuracy | {final_accuracy:.2%} |
+| Generated evaluation examples | {int(metrics["evaluated_examples"])} |
+| Final evaluation loss | {float(eval_metrics["eval_loss"]):.4f} |
+| Mean training loss | {float(train_metrics["train_loss"]):.4f} |
+
+Training loss can continue falling while validation loss rises because the
+model becomes more confident on repeated training rows without improving
+equally on unseen rows. Cross-entropy can increase from a few confidently wrong
+tokens even when average token accuracy changes little.
+
+See the [Trackio dashboard](https://huggingface.co/spaces/{trackio_space_id})
+for the training curves. TensorBoard events, `trainer_state.json`, and
+`training_metrics.json` are included in this repository.
+
+## Training configuration
+
+| Setting | Value |
+| --- | --- |
+| Training examples | {len(SELECTED_INTENTS) * int(config["train_examples_per_intent"])} |
+| Evaluation examples | {len(SELECTED_INTENTS) * int(config["eval_examples_per_intent"])} |
+| Epochs | {float(config["epochs"]):g} |
+| Learning rate | {LEARNING_RATE} |
+| Effective batch size | {TRAIN_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS} |
+| Maximum sequence length | {MAX_SEQUENCE_LENGTH} |
+| Loss | `chunked_nll`, full rendered sequence except padding |
+| Warmup | {warmup_description} |
+| Seed | {int(config["seed"])} |
+
+Software:
+
+{versions_list}
+
+## Precision and limitations
+
+Load the saved FP32 checkpoint without forcing all weights to FP16. The
+verified FP32 Hub reload produced a valid function call, while forced pure FP16
+on a T4 produced padding-only output. Training used FP16 autocast around FP32
+master weights.
+
+- Only ten BANKING77 intents are supported, not all 77.
+- There is no out-of-scope or refusal route.
+- Argument quality was not scored separately from tool-name selection.
+- Ambiguous, adversarial, multilingual, or unrelated requests may route
+  incorrectly.
+- Do not use this model for financial decisions without production privacy,
+  safety, monitoring, fallback, and human-review controls.
+
+The BANKING77 mirror describes the dataset as CC BY 4.0. FunctionGemma weights
+remain subject to the Gemma terms.
+"""
+
+    @staticmethod
+    def _example_rows(
+        predictions: list[dict[str, str]],
+        limit: int = 6,
+    ) -> list[tuple[str, str, str]]:
+        """Select deterministic examples with distinct generated tools."""
+
+        examples: list[tuple[str, str, str]] = []
+        seen_tools: set[str] = set()
+        for row in predictions:
+            predicted_tool = row["predicted_tool"]
+            if predicted_tool in seen_tools:
+                continue
+            raw_output = row.get("first_function_call") or row.get("raw_generation", "")
+            end_marker = "<end_function_call>"
+            if end_marker in raw_output:
+                raw_output = raw_output.split(end_marker, maxsplit=1)[0] + end_marker
+            examples.append(
+                (row["customer_message"], predicted_tool, raw_output.strip())
+            )
+            seen_tools.add(predicted_tool)
+            if len(examples) == limit:
+                break
+        if not examples:
+            raise ValueError("No final predictions are available for the model card.")
+        return examples
+
+    @staticmethod
+    def _markdown_code(value: str) -> str:
+        """Format a short value safely inside a Markdown table cell."""
+
+        escaped = value.replace("|", "\\|").replace("\n", " ")
+        return f"`{escaped}`"
+
+    @staticmethod
+    def _warmup_description(metrics: dict[str, Any]) -> str:
+        """Describe either the corrected run or the original reference run."""
+
+        contract = metrics.get("training_contract")
+        if isinstance(contract, dict) and "warmup_steps" in contract:
+            return f"{int(contract['warmup_steps'])} steps"
+        return "0.1 steps in the reference run (effectively no warmup)"
+
+    @staticmethod
+    def _usage_code(model_repo_id: str) -> str:
+        """Create standalone inference code with all ten tool definitions."""
+
+        descriptions = json.dumps(
+            {
+                tool_name(intent): description
+                for intent, description in INTENT_DESCRIPTIONS.items()
+            },
+            indent=4,
+        )
+        template = """import re
+
+from transformers import AutoModelForCausalLM, AutoTokenizer
+
+MODEL_ID = "__MODEL_ID__"
+TOOL_DESCRIPTIONS = __TOOL_DESCRIPTIONS__
+
+
+def make_tool(name: str, description: str) -> dict:
+    return {
+        "type": "function",
+        "function": {
+            "name": name,
+            "description": description,
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "customer_message": {"type": "string"},
+                },
+                "required": ["customer_message"],
+            },
+            "return": {"type": "string"},
+        },
+    }
+
+
+tools = [make_tool(name, description) for name, description in TOOL_DESCRIPTIONS.items()]
+model = AutoModelForCausalLM.from_pretrained(MODEL_ID, device_map="auto")
+tokenizer = AutoTokenizer.from_pretrained(MODEL_ID)
+message = "My card was stolen last night"
+inputs = tokenizer.apply_chat_template(
+    [
+        {
+            "role": "developer",
+            "content": "You route customer requests by calling exactly one banking support tool.",
+        },
+        {"role": "user", "content": message},
+    ],
+    tools=tools,
+    add_generation_prompt=True,
+    return_tensors="pt",
+    return_dict=True,
+).to(model.device)
+output = model.generate(**inputs, max_new_tokens=64, do_sample=False)
+generated = tokenizer.decode(
+    output[0, inputs["input_ids"].shape[1] :],
+    skip_special_tokens=False,
+)
+match = re.search(
+    r"<start_function_call>call:([a-z0-9_]+).*?<end_function_call>",
+    generated,
+    re.DOTALL,
+)
+if match is None:
+    raise ValueError(f"No complete function call: {generated!r}")
+print({"tool": match.group(1), "raw_call": match.group(0)})"""
+        return template.replace("__MODEL_ID__", model_repo_id).replace(
+            "__TOOL_DESCRIPTIONS__",
+            descriptions,
+        )
+
+
+class HubExperimentPublisher:
+    """Generate the model card, publish artifacts, and verify Hub state."""
+
+    def __init__(self, output_dir: Path) -> None:
+        self.output_dir = output_dir
+        self.api = HfApi(token=load_hf_token())
+
+    @staticmethod
+    def validate_access() -> str:
+        """Fail before training if publication lacks authenticated Hub access."""
+
+        identity = HfApi(token=load_hf_token()).whoami()
+        username = identity.get("name")
+        if not isinstance(username, str) or not username:
+            raise RuntimeError("Hugging Face did not return an account username.")
+        return username
+
+    def publish(self, metrics_path: Path | None = None) -> PublicationResult:
+        """Generate a fresh card from metrics, publish, and verify the result."""
+
+        resolved_metrics_path = (
+            metrics_path or self.output_dir / "training_metrics.json"
+        )
+        self._validate_local_artifacts(resolved_metrics_path)
+        username = self._authenticated_username()
+        model_repo_id = f"{username}/{MODEL_REPO_NAME}"
+        trackio_space_id = f"{username}/{TRACKIO_SPACE_NAME}"
+        metrics = json.loads(resolved_metrics_path.read_text(encoding="utf-8"))
+        metrics["model_repo_id"] = model_repo_id
+        metrics["trackio_space_id"] = trackio_space_id
+        resolved_metrics_path.write_text(
+            json.dumps(metrics, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        (self.output_dir / "README.md").write_text(
+            ModelCardRenderer.render(metrics, model_repo_id, trackio_space_id),
+            encoding="utf-8",
+        )
+
+        print("\n=== 8. GENERATE MODEL CARD, PUBLISH, AND VERIFY ===")
+        trackio_url = self._sync_trackio(trackio_space_id, username)
+        model_url = self._upload_model(model_repo_id)
+        self._verify_remote(model_repo_id, trackio_space_id)
+        return PublicationResult(model_url=model_url, trackio_url=trackio_url)
+
+    def _validate_local_artifacts(self, metrics_path: Path) -> None:
+        """Fail before remote writes when a completed run is unavailable."""
+
+        required = [self.output_dir / name for name in REQUIRED_LOCAL_ARTIFACTS]
+        required.append(metrics_path)
+        missing = sorted(str(path) for path in set(required) if not path.is_file())
+        if missing:
+            raise FileNotFoundError(
+                "Cannot publish an incomplete experiment. Missing: "
+                + ", ".join(missing)
+            )
+
+    def _authenticated_username(self) -> str:
+        """Resolve the Hub namespace from the token rather than an email."""
+
+        identity = self.api.whoami()
+        username = identity.get("name")
+        if not isinstance(username, str) or not username:
+            raise RuntimeError("Hugging Face did not return an account username.")
+        print(f"Authenticated Hugging Face user: {username}")
+        return username
+
+    @staticmethod
+    def _sync_trackio(trackio_space_id: str, username: str) -> str:
+        """Persist the local Trackio run in a free static Space."""
+
+        synced_space_id = trackio.sync(
+            project=TRACKIO_PROJECT,
+            space_id=trackio_space_id,
+            bucket_id=f"{username}/{TRACKIO_BUCKET_NAME}",
+            force=True,
+            sdk="static",
+        )
+        return f"https://huggingface.co/spaces/{synced_space_id}"
+
+    def _upload_model(self, model_repo_id: str) -> str:
+        """Upload final artifacts, including the newly generated README."""
+
+        self.api.create_repo(model_repo_id, repo_type="model", exist_ok=True)
+        self.api.upload_folder(
+            repo_id=model_repo_id,
+            repo_type="model",
+            folder_path=self.output_dir,
+            ignore_patterns=["checkpoint-*", "**/checkpoint-*"],
+            commit_message="Publish FunctionGemma banking router experiment",
+        )
+        return f"https://huggingface.co/{model_repo_id}"
+
+    def _verify_remote(self, model_repo_id: str, trackio_space_id: str) -> None:
+        """Check required model files and the static Trackio Space."""
+
+        remote_files = set(self.api.list_repo_files(model_repo_id, repo_type="model"))
+        missing = sorted(set(REQUIRED_REMOTE_ARTIFACTS).difference(remote_files))
+        if missing:
+            raise RuntimeError("Published model is missing: " + ", ".join(missing))
+        space = self.api.space_info(trackio_space_id)
+        if space.sdk != "static":
+            raise RuntimeError(
+                f"Expected a static Trackio Space, found sdk={space.sdk!r}."
+            )
+        print("Verified model files and static Trackio Space on Hugging Face.")
+
+
+def load_hf_token() -> str:
+    """Load a Hub token from supported boundaries without printing it."""
+
+    environment_token = os.environ.get("HF_TOKEN", "").strip()
+    if environment_token:
+        return environment_token
+    for token_path in (REMOTE_TOKEN_PATH, LOCAL_TOKEN_PATH):
+        if not token_path.is_file():
+            continue
+        token = token_path.read_text(encoding="utf-8").strip()
+        if token:
+            os.environ["HF_TOKEN"] = token
+            if token_path == REMOTE_TOKEN_PATH:
+                token_path.unlink()
+            return token
+    raise RuntimeError(
+        "A write-capable Hugging Face token is required. Set HF_TOKEN, use "
+        "`hf auth login`, or add an HF_TOKEN secret in Colab."
+    )
 
 
 def package_versions() -> dict[str, str]:
@@ -763,9 +1219,7 @@ def main() -> None:
     args = parse_args()
     output_dir = Path(args.output_dir)
     if args.publish_only:
-        from publish_functiongemma_banking77 import publish_completed_experiment
-
-        result = publish_completed_experiment(output_dir=output_dir)
+        result = HubExperimentPublisher(output_dir).publish()
         print(f"Model: {result.model_url}")
         print(f"Trackio dashboard: {result.trackio_url}")
         return
