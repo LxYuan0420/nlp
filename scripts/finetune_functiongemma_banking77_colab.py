@@ -180,13 +180,50 @@ class ExperimentConfig:
 
 
 class BankingToolDatasetPreparer:
-    """Own the BANKING77 selection and tool-conversation transformation."""
+    """Convert BANKING77 classification rows into tool-calling conversations.
+
+    Input rows come from ``mteb/banking77`` and contain fields such as::
+
+        {"text": "My card is lost", "label_text": "lost_or_stolen_card"}
+
+    Output rows contain the model-native supervision consumed by
+    ``SFTTrainer``::
+
+        {
+            "messages": [
+                {"role": "developer", "content": "..."},
+                {"role": "user", "content": "My card is lost"},
+                {
+                    "role": "assistant",
+                    "tool_calls": [{
+                        "type": "function",
+                        "function": {
+                            "name": "handle_lost_or_stolen_card",
+                            "arguments": {"customer_message": "My card is lost"},
+                        },
+                    }],
+                },
+            ],
+            "tools": [<ten JSON function schemas>],
+        }
+    """
 
     def __init__(self, config: ExperimentConfig) -> None:
         self.config = config
 
     def prepare(self) -> DatasetDict:
-        """Return deterministic, balanced train and held-out tool-call rows."""
+        """Load, balance, and transform the configured BANKING77 subsets.
+
+        Inputs:
+            ``self.config`` supplies the random seed and the number of examples
+            selected per intent for the source train and test splits.
+
+        Returns:
+            A ``DatasetDict`` with ``train`` and ``test`` splits. Source columns
+            such as ``text`` and ``label_text`` are replaced by ``messages`` and
+            ``tools``. Each assistant message contains exactly one expected
+            function call, as illustrated in the class docstring.
+        """
 
         raw = load_dataset(DATASET_ID)
         train_split = raw["train"]
@@ -222,39 +259,23 @@ class BankingToolDatasetPreparer:
         )
 
     @staticmethod
-    def explain(dataset: DatasetDict) -> None:
-        """Print the source schema and one complete transformed training row."""
-
-        sample = dataset["train"][0]
-        expected_tool = ToolRoutingEvaluator.expected_tool(sample)
-        print("\n=== 1. PREPARE DATASET ===")
-        print(f"Source: {DATASET_ID}")
-        print("Source schema:")
-        print(
-            json.dumps(
-                {"text": "string", "label": "int", "label_text": "string"}, indent=2
-            )
-        )
-        print(
-            f"Balanced subset: {len(dataset['train'])} train / "
-            f"{len(dataset['test'])} held-out rows across "
-            f"{len(SELECTED_INTENTS)} intents."
-        )
-        print("\nTransformation:")
-        print("  {text, label_text} -> {messages, tools}")
-        print("  label_text -> assistant tool_calls[0].function.name")
-        print(f"\nCustomer message: {sample['messages'][1]['content']}")
-        print(f"Class label becomes tool: {expected_tool}")
-        print("\nComplete transformed row:")
-        print(json.dumps(sample, indent=2))
-
-    @staticmethod
     def _balanced_subset(
         dataset: Dataset,
         examples_per_intent: int,
         seed: int,
     ) -> Dataset:
-        """Select the same number of examples for every supported intent."""
+        """Select and shuffle an equal number of rows for every intent.
+
+        Args:
+            dataset: A raw BANKING77 split containing ``label_text``.
+            examples_per_intent: Number of rows retained for each of the ten
+                supported intents.
+            seed: Base seed. Each intent receives a deterministic offset.
+
+        Returns:
+            One shuffled ``Dataset`` containing
+            ``examples_per_intent * 10`` source-format rows.
+        """
 
         subsets: list[Dataset] = []
         for offset, intent in enumerate(SELECTED_INTENTS):
@@ -275,7 +296,18 @@ class BankingToolDatasetPreparer:
 
     @staticmethod
     def _to_tool_conversation(row: dict[str, Any]) -> dict[str, Any]:
-        """Convert one classification row to FunctionGemma's native structure."""
+        """Convert one classification example into one supervised tool call.
+
+        Args:
+            row: A BANKING77 row with ``text`` and ``label_text``. For example,
+                ``{"text": "Change my PIN", "label_text": "change_pin"}``.
+
+        Returns:
+            A dictionary with ``messages`` and ``tools``. The example input
+            produces an assistant call whose function name is
+            ``handle_change_pin`` and whose ``customer_message`` argument is
+            ``"Change my PIN"``.
+        """
 
         customer_message = row["text"]
         intent = row["label_text"]
@@ -305,13 +337,28 @@ class ToolRoutingEvaluator:
 
     @staticmethod
     def expected_tool(sample: dict[str, Any]) -> str:
-        """Read the supervised tool name from a transformed dataset row."""
+        """Return the supervised name, such as ``handle_change_pin``.
+
+        Args:
+            sample: One transformed row returned by
+                ``BankingToolDatasetPreparer.prepare``.
+        """
 
         return sample["messages"][2]["tool_calls"][0]["function"]["name"]
 
     @staticmethod
     def first_function_call(generated_text: str) -> tuple[str, str]:
-        """Return the first complete FunctionGemma call and its function name."""
+        """Extract the first complete call from raw FunctionGemma text.
+
+        Args:
+            generated_text: Model output that may continue after the first
+                ``<end_function_call>`` marker.
+
+        Returns:
+            ``(tool_name, complete_call)``. If no complete call exists, the
+            tool name is ``no_function_call`` and the second item is the
+            stripped raw output.
+        """
 
         match = FUNCTION_CALL_PATTERN.search(generated_text)
         if match is None:
@@ -326,7 +373,25 @@ class ToolRoutingEvaluator:
         eval_dataset: Dataset,
         limit: int,
     ) -> tuple[float, list[dict[str, str]]]:
-        """Generate on held-out messages and compute exact first-tool accuracy."""
+        """Generate held-out calls and compute exact first-tool accuracy.
+
+        Args:
+            model: The base or fine-tuned causal language model.
+            tokenizer: FunctionGemma tokenizer containing its chat template.
+            eval_dataset: Transformed rows with expected assistant tool calls.
+            limit: Maximum number of rows evaluated in deterministic order.
+
+        Returns:
+            ``(accuracy, predictions)``. Accuracy is a float from 0 to 1. Each
+            prediction has this readable shape::
+
+                {
+                    "customer_message": "Change my PIN",
+                    "expected_tool": "handle_change_pin",
+                    "predicted_tool": "handle_change_pin",
+                    "first_function_call": "<start_function_call>...",
+                }
+        """
 
         sample_count = min(limit, len(eval_dataset))
         samples = eval_dataset.select(range(sample_count))
@@ -391,18 +456,15 @@ class ToolRoutingEvaluator:
         accuracy: float,
         rows: list[dict[str, str]],
     ) -> None:
-        """Print varied inputs and their first generated tool calls."""
+        """Print one metric plus three compact input-to-tool examples."""
 
         print(f"\n=== {title} ===")
         print(f"Held-out exact tool-selection accuracy: {accuracy:.2%}")
-        for row in rows[:5]:
+        for row in rows[:3]:
             status = (
                 "correct" if row["expected_tool"] == row["predicted_tool"] else "wrong"
             )
-            print(f"[{status}] {row['customer_message']}")
-            print(f"  expected:  {row['expected_tool']}")
-            print(f"  predicted: {row['predicted_tool']}")
-            print(f"  output:    {row['first_function_call']}")
+            print(f"[{status}] {row['customer_message']} -> {row['predicted_tool']}")
 
 
 class FunctionGemmaExperiment:
@@ -415,17 +477,37 @@ class FunctionGemmaExperiment:
         self.evaluator = ToolRoutingEvaluator()
 
     def run(self, *, validate_only: bool, inspect_model: bool) -> None:
-        """Execute the requested stages in the same order they are taught."""
+        """Run preparation, training, evaluation, saving, and publication.
+
+        Args:
+            validate_only: Stop after loading and transforming the dataset.
+            inspect_model: Stop after loading the model and printing one exact
+                rendered training prompt. This is the intentionally verbose
+                inspection mode; normal training prints compact summaries.
+
+        Returns:
+            ``None``. Model files, metrics, predictions, and tracking logs are
+            written under ``config.output_dir`` when training completes.
+        """
 
         set_seed(self.config.seed)
+        print("\n=== 1. PREPARE DATASET ===")
         dataset = BankingToolDatasetPreparer(self.config).prepare()
-        BankingToolDatasetPreparer.explain(dataset)
+        print(
+            f"Prepared {len(dataset['train'])} train and {len(dataset['test'])} "
+            f"held-out tool-calling rows across {len(SELECTED_INTENTS)} intents."
+        )
         if validate_only:
             print("\nDataset validation complete. No model was loaded or published.")
             return
 
         model, tokenizer = self._load_model()
-        self._explain_model(model, tokenizer, dataset["train"][0])
+        self._summarize_model(
+            model,
+            tokenizer,
+            dataset["train"][0],
+            show_rendered_prompt=inspect_model,
+        )
         self._validate_prompt_lengths(dataset, tokenizer)
         if inspect_model:
             print("\nModel inspection complete. Nothing was trained or published.")
@@ -433,8 +515,7 @@ class FunctionGemmaExperiment:
 
         self._validate_training_environment()
         if self.config.publish:
-            username = HubExperimentPublisher.validate_access()
-            print(f"Publication namespace: {username}")
+            HubExperimentPublisher.validate_access()
         self.output_dir.mkdir(parents=True, exist_ok=True)
         trainer = self._build_trainer(model, tokenizer, dataset)
 
@@ -481,7 +562,13 @@ class FunctionGemmaExperiment:
 
     @staticmethod
     def _load_model() -> tuple[PreTrainedModel, PreTrainedTokenizerBase]:
-        """Load FP32 master weights; Trainer supplies FP16 autocast on the T4."""
+        """Load the trainable model and tokenizer.
+
+        Returns:
+            ``(model, tokenizer)``. The model has FP32 master weights; TRL uses
+            FP16 autocast during T4 training. The tokenizer owns FunctionGemma's
+            tool-aware chat template.
+        """
 
         print("\n=== 2. PREPARE MODEL ===")
         model = AutoModelForCausalLM.from_pretrained(
@@ -493,12 +580,26 @@ class FunctionGemmaExperiment:
         return model, tokenizer
 
     @staticmethod
-    def _explain_model(
+    def _summarize_model(
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizerBase,
         sample: dict[str, Any],
+        *,
+        show_rendered_prompt: bool,
     ) -> None:
-        """Show parameter counts and the exact serialized training example."""
+        """Print model metadata and optionally one rendered prompt.
+
+        Args:
+            model: Loaded FunctionGemma causal language model.
+            tokenizer: Tokenizer used to serialize messages and tool schemas.
+            sample: One transformed row with ``messages`` and ``tools``.
+            show_rendered_prompt: Print the full serialized prompt only for
+                explicit ``--inspect-model`` runs.
+
+        Returns:
+            ``None``. A normal run prints one compact summary line. Inspection
+            mode additionally prints the exact string given to the tokenizer.
+        """
 
         formatted = tokenizer.apply_chat_template(
             sample["messages"],
@@ -513,22 +614,30 @@ class FunctionGemmaExperiment:
             if parameter.requires_grad
         )
         token_count = len(tokenizer(formatted, add_special_tokens=False)["input_ids"])
-        print(f"Base model: {BASE_MODEL_ID}")
-        print(f"Architecture: {model.config.model_type} causal language model")
         print(
-            f"Parameters: {total_parameters:,} total / {trainable_parameters:,} trainable"
+            f"{BASE_MODEL_ID}: {model.config.model_type}, "
+            f"{trainable_parameters:,}/{total_parameters:,} trainable parameters, "
+            f"example length {token_count} tokens."
         )
-        print("Method: full fine-tuning, producing one standalone checkpoint")
-        print(f"Rendered example length: {token_count} tokens")
-        print("\nFunctionGemma chat-template output:")
-        print(formatted)
+        if show_rendered_prompt:
+            print("\nFunctionGemma chat-template output:\n")
+            print(formatted)
 
     @staticmethod
     def _validate_prompt_lengths(
         dataset: DatasetDict,
         tokenizer: PreTrainedTokenizerBase,
     ) -> None:
-        """Fail before training if any supervised function call is truncated."""
+        """Verify all transformed rows fit without target truncation.
+
+        Args:
+            dataset: Prepared train and test tool-calling rows.
+            tokenizer: FunctionGemma tokenizer used to render and count tokens.
+
+        Returns:
+            ``None``. Raises ``ValueError`` when the longest row exceeds
+            ``MAX_SEQUENCE_LENGTH``.
+        """
 
         longest = 0
         for split in dataset.values():
@@ -541,8 +650,7 @@ class FunctionGemmaExperiment:
                     return_dict=False,
                 )
                 longest = max(longest, len(token_ids))
-        print(f"Longest rendered row: {longest} tokens")
-        print(f"Maximum sequence length: {MAX_SEQUENCE_LENGTH} tokens")
+        print(f"Prompt lengths: longest={longest}, limit={MAX_SEQUENCE_LENGTH} tokens.")
         if longest > MAX_SEQUENCE_LENGTH:
             raise ValueError(
                 "A supervised function call would be truncated. Increase "
@@ -551,7 +659,7 @@ class FunctionGemmaExperiment:
 
     @staticmethod
     def _validate_training_environment() -> None:
-        """Require CUDA only at the boundary where training begins."""
+        """Require CUDA at the training boundary and print the assigned GPU."""
 
         if not torch.cuda.is_available():
             raise RuntimeError(
@@ -566,7 +674,19 @@ class FunctionGemmaExperiment:
         tokenizer: PreTrainedTokenizerBase,
         dataset: DatasetDict,
     ) -> SFTTrainer:
-        """Create the explicit, reproducible TRL training configuration."""
+        """Create the reproducible TRL trainer.
+
+        Args:
+            model: FP32 FunctionGemma model to fully fine-tune.
+            tokenizer: Serializer for the conversational tool-calling rows.
+            dataset: ``DatasetDict`` returned by ``prepare``. ``train`` drives
+                optimization and ``test`` supplies epoch validation loss.
+
+        Returns:
+            An ``SFTTrainer`` configured for full-sequence ``chunked_nll``.
+            It logs to TensorBoard and local Trackio, evaluates once per epoch,
+            and saves at most one intermediate checkpoint.
+        """
 
         print("\n=== 3. CONFIGURE TRAINING AND TRACKING ===")
         run_name = (
@@ -597,6 +717,9 @@ class FunctionGemmaExperiment:
             assistant_only_loss=False,
             # TRL 1.12 defaults to chunked_nll. Pin it explicitly so a future
             # library default cannot silently change the experiment objective.
+            # It uses the same labels and cross-entropy as nll, but projects the
+            # vocabulary logits for non-ignored positions in smaller chunks
+            # instead of materializing one [batch, sequence, vocabulary] tensor.
             loss_type="chunked_nll",
             gradient_checkpointing=False,
             fp16=True,
@@ -614,13 +737,12 @@ class FunctionGemmaExperiment:
             seed=self.config.seed,
             data_seed=self.config.seed,
         )
-        print(json.dumps(asdict(self.config), indent=2))
-        print(f"Learning rate: {LEARNING_RATE}")
-        print(f"Warmup: {warmup_steps} steps ({WARMUP_FRACTION:.0%} of the run)")
-        print(f"Effective batch size: {TRAIN_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS}")
-        print("Loss: chunked NLL (next-token cross-entropy), excluding padding")
-        print(f"TensorBoard directory: {self.tensorboard_dir}")
-        print(f"Trackio project: {TRACKIO_PROJECT} (local during training)")
+        print(
+            f"epochs={self.config.epochs:g}, learning_rate={LEARNING_RATE}, "
+            f"effective_batch={TRAIN_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS}, "
+            f"warmup_steps={warmup_steps}, loss=chunked_nll."
+        )
+        print(f"Logs: TensorBoard={self.tensorboard_dir}, Trackio={TRACKIO_PROJECT}.")
         return SFTTrainer(
             model=model,
             args=training_args,
@@ -641,7 +763,25 @@ class FunctionGemmaExperiment:
         baseline_predictions: list[dict[str, str]],
         final_predictions: list[dict[str, str]],
     ) -> Path:
-        """Save weights, state, metrics, versions, and prediction evidence."""
+        """Save the standalone model and all reproducibility evidence.
+
+        Args:
+            trainer: Completed trainer containing model weights and log history.
+            tokenizer: Tokenizer and chat template paired with the model.
+            train_metrics: Runtime and aggregate loss returned by ``train``.
+            eval_metrics: Final token-level validation measurements.
+            baseline_accuracy: Exact generated tool accuracy before training.
+            final_accuracy: Exact generated tool accuracy after training.
+            baseline_predictions: Per-request baseline outputs.
+            final_predictions: Per-request fine-tuned outputs.
+
+        Returns:
+            Path to ``training_metrics.json``. Its top-level keys include
+            ``config``, ``training_contract``, ``train_metrics``,
+            ``eval_metrics``, both prediction lists, package ``versions``, and
+            tracking destinations. The same file later drives model-card
+            generation, so published claims come from recorded results.
+        """
 
         print("\n=== 7. SAVE ARTIFACTS ===")
         trainer.save_model(str(self.output_dir))
@@ -684,7 +824,7 @@ class FunctionGemmaExperiment:
         return metrics_path
 
     def _publish_if_requested(self, metrics_path: Path) -> None:
-        """Generate the card from metrics and publish the completed experiment."""
+        """Generate the card from ``metrics_path`` and publish the output folder."""
 
         if not self.config.publish:
             print("Publication disabled with --no-push-to-hub.")
@@ -836,7 +976,9 @@ dataset rather than a prompt-completion dataset. Therefore every non-padding
 token in the rendered developer prompt, tool declarations, user message, and
 assistant call contributes. Padding labels use `-100` and are ignored. Exact
 generated tool accuracy is a separate application metric and is not the
-differentiable loss. See the
+differentiable loss. Chunking does not alter this token selection; the label
+mask controls which tokens contribute, while `loss_type` controls how the same
+calculation is held in memory. See the
 [TRL 1.12 SFT documentation]({TRL_LOSS_DOCUMENTATION}).
 
 ## Results
