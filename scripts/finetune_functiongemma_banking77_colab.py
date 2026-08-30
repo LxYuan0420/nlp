@@ -501,14 +501,14 @@ class FunctionGemmaExperiment:
             print("\nDataset validation complete. No model was loaded or published.")
             return
 
-        model, tokenizer = self._load_model()
-        self._summarize_model(
+        model, tokenizer = self.load_model()
+        self.summarize_model(
             model,
             tokenizer,
             dataset["train"][0],
             show_rendered_prompt=inspect_model,
         )
-        self._validate_prompt_lengths(dataset, tokenizer)
+        self.validate_prompt_lengths(dataset, tokenizer)
         if inspect_model:
             print("\nModel inspection complete. Nothing was trained or published.")
             return
@@ -517,7 +517,7 @@ class FunctionGemmaExperiment:
         if self.config.publish:
             HubExperimentPublisher.validate_access()
         self.output_dir.mkdir(parents=True, exist_ok=True)
-        trainer = self._build_trainer(model, tokenizer, dataset)
+        trainer = self.build_trainer(model, tokenizer, dataset)
 
         baseline_accuracy, baseline_predictions = self.evaluator.evaluate(
             trainer.model,
@@ -548,7 +548,7 @@ class FunctionGemmaExperiment:
             final_predictions,
         )
 
-        metrics_path = self._save_artifacts(
+        metrics_path = self.save_artifacts(
             trainer=trainer,
             tokenizer=tokenizer,
             train_metrics=train_result.metrics,
@@ -558,10 +558,10 @@ class FunctionGemmaExperiment:
             baseline_predictions=baseline_predictions,
             final_predictions=final_predictions,
         )
-        self._publish_if_requested(metrics_path)
+        self.publish(metrics_path)
 
     @staticmethod
-    def _load_model() -> tuple[PreTrainedModel, PreTrainedTokenizerBase]:
+    def load_model() -> tuple[PreTrainedModel, PreTrainedTokenizerBase]:
         """Load the trainable model and tokenizer.
 
         Returns:
@@ -580,7 +580,7 @@ class FunctionGemmaExperiment:
         return model, tokenizer
 
     @staticmethod
-    def _summarize_model(
+    def summarize_model(
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizerBase,
         sample: dict[str, Any],
@@ -624,7 +624,7 @@ class FunctionGemmaExperiment:
             print(formatted)
 
     @staticmethod
-    def _validate_prompt_lengths(
+    def validate_prompt_lengths(
         dataset: DatasetDict,
         tokenizer: PreTrainedTokenizerBase,
     ) -> None:
@@ -668,7 +668,7 @@ class FunctionGemmaExperiment:
             )
         print(f"Training GPU: {torch.cuda.get_device_name(0)}")
 
-    def _build_trainer(
+    def build_trainer(
         self,
         model: PreTrainedModel,
         tokenizer: PreTrainedTokenizerBase,
@@ -751,7 +751,7 @@ class FunctionGemmaExperiment:
             processing_class=tokenizer,
         )
 
-    def _save_artifacts(
+    def save_artifacts(
         self,
         *,
         trainer: SFTTrainer,
@@ -823,16 +823,26 @@ class FunctionGemmaExperiment:
         print(f"Saved model and experiment evidence: {self.output_dir.resolve()}")
         return metrics_path
 
-    def _publish_if_requested(self, metrics_path: Path) -> None:
-        """Generate the card from ``metrics_path`` and publish the output folder."""
+    def publish(self, metrics_path: Path) -> PublicationResult | None:
+        """Generate the card from metrics and optionally publish the output.
+
+        Args:
+            metrics_path: ``training_metrics.json`` returned by
+                ``save_artifacts``.
+
+        Returns:
+            Verified model and Trackio URLs when ``config.publish`` is true;
+            otherwise ``None`` after leaving all artifacts local.
+        """
 
         if not self.config.publish:
             print("Publication disabled with --no-push-to-hub.")
-            return
+            return None
 
         result = HubExperimentPublisher(self.output_dir).publish(metrics_path)
         print(f"Model: {result.model_url}")
         print(f"Trackio dashboard: {result.trackio_url}")
+        return result
 
 
 @dataclass(frozen=True)
