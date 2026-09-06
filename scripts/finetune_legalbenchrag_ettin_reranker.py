@@ -79,6 +79,7 @@ import random
 import re
 import shutil
 import time
+import unicodedata
 import urllib.request
 import zipfile
 from collections import Counter, defaultdict
@@ -328,7 +329,10 @@ class LegalBenchRAGSource:
                 snippets = row.get("snippets")
                 if not isinstance(snippets, list) or not snippets:
                     raise ValueError(f"{benchmark_path}:{row_index} has no snippets.")
-                file_paths = {snippet["file_path"] for snippet in snippets}
+                file_paths = {
+                    self._canonical_document_path(snippet["file_path"])
+                    for snippet in snippets
+                }
                 if len(file_paths) != 1:
                     raise ValueError(
                         f"{benchmark_path}:{row_index} references {len(file_paths)} documents."
@@ -406,6 +410,7 @@ class LegalBenchRAGSource:
             "evidence_spans": evidence_count,
             "missing_documents": 0,
             "span_mismatches": 0,
+            "unicode_path_normalization": "NFC",
         }
         return queries, documents, manifest
 
@@ -432,9 +437,11 @@ class LegalBenchRAGSource:
 
     def _safe_extract(self, archive_path: Path) -> None:
         root = self.data_dir.resolve()
+        extracted_files: dict[Path, str] = {}
         with zipfile.ZipFile(archive_path) as archive:
             for member in archive.infolist():
-                relative = PurePosixPath(member.filename)
+                normalized_name = unicodedata.normalize("NFC", member.filename)
+                relative = PurePosixPath(normalized_name)
                 if not relative.parts or relative.is_absolute():
                     continue
                 if relative.parts[0] not in {"corpus", "benchmarks"}:
@@ -445,9 +452,27 @@ class LegalBenchRAGSource:
                 if member.is_dir():
                     destination.mkdir(parents=True, exist_ok=True)
                     continue
+                previous_member = extracted_files.get(destination)
+                if previous_member is not None:
+                    raise ValueError(
+                        "Archive members collide after NFC normalization: "
+                        f"{previous_member!r} and {member.filename!r}."
+                    )
+                extracted_files[destination] = member.filename
                 destination.parent.mkdir(parents=True, exist_ok=True)
                 with archive.open(member) as source, destination.open("wb") as output:
                     shutil.copyfileobj(source, output)
+
+    @staticmethod
+    def _canonical_document_path(value: Any) -> str:
+        if not isinstance(value, str):
+            raise TypeError(
+                f"Document path must be a string, got {type(value).__name__}."
+            )
+        relative = PurePosixPath(unicodedata.normalize("NFC", value))
+        if relative.is_absolute() or ".." in relative.parts or len(relative.parts) < 2:
+            raise ValueError(f"Unsafe document path in benchmark data: {value!r}.")
+        return relative.as_posix()
 
     @staticmethod
     def _sha256(path: Path) -> str:
