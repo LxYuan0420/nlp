@@ -54,11 +54,9 @@ Run a small local-only GPU smoke test:
     uv run --script scripts/finetune_legalbenchrag_ettin_reranker.py \
         --smoke-run
 
-Publishing is intentionally a separate one-off operation. After this script
-finishes, generate the model card, upload the saved directory, and verify the
-remote model with:
-
-    uv run --script scripts/publish_legalbenchrag_ettin_reranker.py
+Publishing is intentionally a separate one-off operation outside this source
+repository. It consumes the completed output directory, generates the model
+card, uploads the artifacts, and verifies the remote model without retraining.
 
 The model expects ``(query, candidate passage)`` pairs and emits one relevance
 logit per pair. It does not search a corpus or provide legal advice. In a real
