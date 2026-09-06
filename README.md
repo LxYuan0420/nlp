@@ -50,6 +50,7 @@
 - [Finetuning Sentence Transformer Model using Matryoshka Loss](notebooks/Finetuning_Embedding_Model_Matryoshka_768_64_NLI.ipynb)
 - [Finetuning LiquidAI/LFM2-2.6B Model using Lora and TRL](https://github.com/LxYuan0420/nlp/blob/main/notebooks/sft_trl_lora_qlora.ipynb)
 - [Fine-tuning FunctionGemma for Banking Tool Routing with TRL](scripts/finetune_functiongemma_banking77_colab.py) ([model](https://huggingface.co/lxyuan/FunctionGemma-270M-banking77-router))
+- [Fine-tuning Ettin-150M for LegalBench-RAG Passage Reranking](scripts/finetune_legalbenchrag_ettin_reranker.py) ([model](https://huggingface.co/lxyuan/LegalBenchRAG-Ettin-150M-Reranker))
 
 #### [spaCy]
 - [Extract Subject-Verb-Object Relation using spaCy Dependency Matcher](notebooks/Extract_Subject_Verb_Object_Relation_using_spaCy_DependencyMatcher.ipynb)

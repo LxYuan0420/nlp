@@ -44,17 +44,6 @@ Resume an interrupted run from a checkpoint in the same output directory:
         --output-dir /content/drive/MyDrive/legalbenchrag-ettin-150m-reranker \
         --resume-from-checkpoint /content/drive/MyDrive/legalbenchrag-ettin-150m-reranker/checkpoints/checkpoint-928
 
-Validate the downloaded corpus and exact character spans without a GPU:
-
-    uv run --script scripts/finetune_legalbenchrag_ettin_reranker.py \
-        --validate-only
-
-Prepare every query, passage, hard negative, and organic candidate without
-loading the model weights:
-
-    uv run --script scripts/finetune_legalbenchrag_ettin_reranker.py \
-        --prepare-only
-
 Run a small local-only GPU smoke test:
 
     uv run --script scripts/finetune_legalbenchrag_ettin_reranker.py \
@@ -142,7 +131,7 @@ EXPECTED_DOCUMENT_COUNTS = {
 EXPECTED_EVIDENCE_SPANS = 10_928
 
 DEFAULT_SEED = 42
-DEFAULT_EPOCHS = 5.0
+DEFAULT_EPOCHS = 3.0
 DEFAULT_TRAIN_RATIO = 0.8
 DEFAULT_VALIDATION_RATIO = 0.1
 MAX_PAIR_TOKENS = 512
@@ -230,8 +219,6 @@ class ExperimentConfig:
     epochs: float
     seed: int
     resume_from_checkpoint: str | None
-    validate_only: bool
-    prepare_only: bool
     smoke_run: bool
 
     @property
@@ -1147,9 +1134,6 @@ class LegalRerankerExperiment:
         source.ensure_available()
         queries, documents, source_manifest = source.load_and_validate()
         self._print_source_summary(source_manifest, queries[0])
-        if self.config.validate_only:
-            self._write_json(output_dir / "dataset_manifest.json", source_manifest)
-            return
 
         tokenizer = AutoTokenizer.from_pretrained(
             BASE_MODEL_ID,
@@ -1162,8 +1146,6 @@ class LegalRerankerExperiment:
         ).prepare(queries, documents, source_manifest)
         self._write_json(output_dir / "dataset_manifest.json", prepared.manifest)
         print(json.dumps(prepared.manifest["split"], indent=2))
-        if self.config.prepare_only:
-            return
 
         self._require_training_device()
         model = self._load_model()
@@ -1377,8 +1359,8 @@ class LegalRerankerExperiment:
     def _require_training_device(self) -> None:
         if not torch.cuda.is_available() and not self.config.smoke_run:
             raise RuntimeError(
-                "The full experiment requires a CUDA GPU. Use --validate-only or "
-                "--prepare-only on CPU, or run the default command on a Colab T4."
+                "The full experiment requires a CUDA GPU. Run the default command "
+                "on a Colab T4."
             )
 
     @staticmethod
@@ -1495,16 +1477,9 @@ def parse_args() -> ExperimentConfig:
             "output directory must also contain baseline_metrics.json."
         ),
     )
-    parser.add_argument("--validate-only", action="store_true")
-    parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--smoke-run", action="store_true")
     args = parser.parse_args()
 
-    modes = sum((args.validate_only, args.prepare_only, args.smoke_run))
-    if modes > 1:
-        parser.error(
-            "Choose only one of --validate-only, --prepare-only, or --smoke-run."
-        )
     if args.epochs <= 0:
         parser.error("--epochs must be greater than zero.")
 
@@ -1518,8 +1493,6 @@ def parse_args() -> ExperimentConfig:
             if args.resume_from_checkpoint is not None
             else None
         ),
-        validate_only=args.validate_only,
-        prepare_only=args.prepare_only,
         smoke_run=args.smoke_run,
     )
 
