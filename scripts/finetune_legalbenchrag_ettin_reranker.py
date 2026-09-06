@@ -166,6 +166,8 @@ WEIGHT_DECAY = 0.01
 LOGGING_STEPS = 25
 EARLY_STOPPING_PATIENCE = 2
 MIN_RECOMMENDED_NDCG_GAIN = 0.02
+VALIDATION_EVALUATOR_NAME = "legalbenchrag-dev"
+VALIDATION_PRIMARY_METRIC = f"{VALIDATION_EVALUATOR_NAME}_ndcg@{RANKING_AT_K}"
 
 SMOKE_DOCUMENTS_PER_DOMAIN = 3
 SMOKE_QUERIES_PER_SPLIT = 16
@@ -1194,11 +1196,11 @@ class LegalRerankerExperiment:
 
         validation_evaluator = self._sentence_transformers_evaluator(
             prepared.validation_cases,
-            name="legalbenchrag-dev",
+            name=VALIDATION_EVALUATOR_NAME,
         )
         if not self.config.reuse_baseline_metrics:
             validation_evaluator(model, output_path=str(output_dir / "baseline-eval"))
-        training_args = self._training_arguments(validation_evaluator)
+        training_args = self._training_arguments()
         trainer = CrossEncoderTrainer(
             model=model,
             args=training_args,
@@ -1324,10 +1326,7 @@ class LegalRerankerExperiment:
             model_kwargs={"dtype": torch.float32, "attn_implementation": "sdpa"},
         )
 
-    def _training_arguments(
-        self,
-        evaluator: CrossEncoderRerankingEvaluator,
-    ) -> CrossEncoderTrainingArguments:
+    def _training_arguments(self) -> CrossEncoderTrainingArguments:
         epochs = SMOKE_EPOCHS if self.config.smoke_run else self.config.epochs
         return CrossEncoderTrainingArguments(
             output_dir=str(self.config.output_path / "checkpoints"),
@@ -1349,7 +1348,7 @@ class LegalRerankerExperiment:
             logging_steps=1 if self.config.smoke_run else LOGGING_STEPS,
             report_to=[],
             load_best_model_at_end=True,
-            metric_for_best_model=f"eval_{evaluator.primary_metric}",
+            metric_for_best_model=f"eval_{VALIDATION_PRIMARY_METRIC}",
             greater_is_better=True,
             save_total_limit=2,
             seed=self.config.seed,
