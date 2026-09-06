@@ -27,16 +27,14 @@ answer generator. The complete experiment has one visible pipeline:
    from the same document as negatives and as organic evaluation candidates.
 4. Measure BM25 and the untouched Ettin reranker, then fully fine-tune all 150M
    parameters with binary cross-entropy and select the best validation NDCG@10.
-5. Save TensorBoard logs, configuration, prediction ranks, and per-domain
-   metrics; generate the model card; publish; reload from the Hub; and verify
-   the documented ``CrossEncoder.rank`` usage.
+5. Save the trained model, TensorBoard logs, resolved configuration, prediction
+   ranks, and per-domain metrics into one self-contained output directory.
 
-The default is sized for a free Colab T4. Runtime is initially estimated at
-2-5 hours and is replaced by observed timing in the published model card.
-Colab availability and session duration are controlled by Google, so run the
-GPU smoke mode before committing the full session.
+The default is sized for a free Colab T4. Colab availability and session
+duration are controlled by Google, so run the GPU smoke mode before committing
+the full session.
 
-Run the complete full-data experiment and publish it:
+Run the complete full-data experiment:
 
     uv run --script scripts/finetune_legalbenchrag_ettin_reranker.py
 
@@ -54,12 +52,13 @@ loading the model weights:
 Run a small local-only GPU smoke test:
 
     uv run --script scripts/finetune_legalbenchrag_ettin_reranker.py \
-        --smoke-run --no-push-to-hub
+        --smoke-run
 
-Recover publication from a completed output directory without retraining:
+Publishing is intentionally a separate one-off operation. After this script
+finishes, generate the model card, upload the saved directory, and verify the
+remote model with:
 
-    uv run --script scripts/finetune_legalbenchrag_ettin_reranker.py \
-        --publish-only
+    uv run --script scripts/publish_legalbenchrag_ettin_reranker.py
 
 The model expects ``(query, candidate passage)`` pairs and emits one relevance
 logit per pair. It does not search a corpus or provide legal advice. In a real
@@ -92,7 +91,6 @@ from typing import Any
 import numpy as np
 import torch
 from datasets import Dataset
-from huggingface_hub import HfApi, ModelCard
 from rank_bm25 import BM25Okapi
 from sentence_transformers import CrossEncoder
 from sentence_transformers.cross_encoder import (
@@ -114,7 +112,6 @@ from transformers.integrations import TensorBoardCallback
 
 BASE_MODEL_ID = "cross-encoder/ettin-reranker-150m-v1"
 BASE_MODEL_REVISION = "025501c4e0f9bbeb4c5b198318e0089ff061cc14"
-MODEL_REPO_NAME = "LegalBenchRAG-Ettin-150M-Reranker"
 UPSTREAM_REPOSITORY = "https://github.com/ZeroEntropy-AI/legalbenchrag"
 DATA_ARCHIVE_URL = (
     "https://www.dropbox.com/scl/fo/r7xfa5i3hdsbxex1w6amw/"
@@ -166,18 +163,6 @@ SMOKE_EPOCHS = 0.03
 
 TOKEN_PATTERN = re.compile(r"[A-Za-z0-9]+")
 PARAGRAPH_BREAK_PATTERN = re.compile(r"\n\s*\n")
-REQUIRED_LOCAL_ARTIFACTS = (
-    "config.json",
-    "model.safetensors",
-    "README.md",
-    "run_config.json",
-    "dataset_manifest.json",
-    "baseline_metrics.json",
-    "final_metrics.json",
-    "training_metrics.json",
-    "trainer_state.json",
-)
-REQUIRED_REMOTE_ARTIFACTS = REQUIRED_LOCAL_ARTIFACTS + ("verification_results.json",)
 
 
 @dataclass(frozen=True, slots=True)
@@ -238,11 +223,9 @@ class ExperimentConfig:
     data_dir: str
     epochs: float
     seed: int
-    publish: bool
     validate_only: bool
     prepare_only: bool
     smoke_run: bool
-    publish_only: bool
 
     @property
     def output_path(self) -> Path:
@@ -1145,10 +1128,6 @@ class LegalRerankerExperiment:
         output_dir = self.config.output_path
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        if self.config.publish_only:
-            HubPublisher(self.config).publish_and_verify()
-            return
-
         source = LegalBenchRAGSource(self.config.data_path)
         source.ensure_available()
         queries, documents, source_manifest = source.load_and_validate()
@@ -1227,7 +1206,7 @@ class LegalRerankerExperiment:
         train_result = trainer.train()
         runtime_seconds = time.perf_counter() - started_at
         trainer.save_state()
-        model.save_pretrained(output_dir)
+        model.save_pretrained(output_dir, create_model_card=False)
         trainer.state.save_to_json(str(output_dir / "trainer_state.json"))
 
         final_metrics, predictions = self.metrics.evaluate_model(
@@ -1251,14 +1230,7 @@ class LegalRerankerExperiment:
             output_dir / "run_config.json", self._run_config(total_parameters)
         )
         self._write_json(output_dir / "package_versions.json", self._package_versions())
-
-        ModelCardWriter(self.config).write()
-        if self.config.publish:
-            del trainer
-            del model
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-            HubPublisher(self.config).publish_and_verify()
+        print(f"Training and evaluation artifacts saved to {output_dir.resolve()}")
 
     def _load_model(self) -> CrossEncoder:
         return CrossEncoder(
@@ -1434,412 +1406,6 @@ class LegalRerankerExperiment:
         )
 
 
-class ModelCardWriter:
-    """Render the public usage and evidence contract from saved run artifacts."""
-
-    def __init__(self, config: ExperimentConfig) -> None:
-        self.config = config
-
-    def write(self) -> Path:
-        output_dir = self.config.output_path
-        manifest = self._read_json(output_dir / "dataset_manifest.json")
-        run_config = self._read_json(output_dir / "run_config.json")
-        metrics = self._read_json(output_dir / "final_metrics.json")
-        training = self._read_json(output_dir / "training_metrics.json")
-        packages = self._read_json(output_dir / "package_versions.json")
-        verification_path = output_dir / "verification_results.json"
-        verification = (
-            self._read_json(verification_path) if verification_path.is_file() else None
-        )
-        repository_id = self._repository_id()
-        card = self._render(
-            repository_id=repository_id,
-            manifest=manifest,
-            run_config=run_config,
-            metrics=metrics,
-            training=training,
-            packages=packages,
-            verification=verification,
-        )
-        ModelCard(card)
-        destination = output_dir / "README.md"
-        destination.write_text(card, encoding="utf-8")
-        return destination
-
-    def _render(
-        self,
-        repository_id: str,
-        manifest: dict[str, Any],
-        run_config: dict[str, Any],
-        metrics: dict[str, Any],
-        training: dict[str, Any],
-        packages: dict[str, str],
-        verification: dict[str, Any] | None,
-    ) -> str:
-        final = metrics["fine_tuned_model"]["overall"]
-        base = metrics["untouched_base_model"]["overall"]
-        bm25 = metrics["bm25"]["overall"]
-        gate = metrics["recommendation_gate"]
-        status_text = (
-            "passed the pre-registered usefulness gate"
-            if gate["passed"]
-            else "did not pass the pre-registered usefulness gate"
-        )
-        domain_rows = "\n".join(
-            "| {domain} | {base:.4f} | {final:.4f} | {delta:+.4f} |".format(
-                domain=domain,
-                base=metrics["untouched_base_model"]["by_domain"][domain]["ndcg@10"],
-                final=metrics["fine_tuned_model"]["by_domain"][domain]["ndcg@10"],
-                delta=metrics["per_domain_ndcg@10_delta"][domain],
-            )
-            for domain in DOMAINS
-        )
-        package_rows = "\n".join(
-            f"| `{name}` | `{version}` |" for name, version in packages.items()
-        )
-        verification_section = self._verification_section(verification)
-        return f"""---
-base_model: {BASE_MODEL_ID}
-base_model_relation: finetune
-library_name: sentence-transformers
-pipeline_tag: text-ranking
-license: apache-2.0
-language:
-- en
-tags:
-- legal
-- retrieval
-- rag
-- reranker
-- cross-encoder
-- modernbert
-- legalbenchrag
----
-
-# LegalBench-RAG Ettin 150M Reranker
-
-This is a fully fine-tuned 150M-parameter cross-encoder for ranking evidence
-passages from English contracts and privacy policies. It starts from
-[`{BASE_MODEL_ID}`](https://huggingface.co/{BASE_MODEL_ID}) and trains on the
-complete LegalBench-RAG release rather than the 776-query mini benchmark.
-
-On the document-held-out organic BM25 candidate test, this run {status_text}.
-The gate required at least +{MIN_RECOMMENDED_NDCG_GAIN:.2f} NDCG@10 over the
-untouched base model without a domain regression worse than
--{MIN_RECOMMENDED_NDCG_GAIN:.2f}. Treat the table below as the capability
-claim; training loss alone is not evidence that retrieval improved.
-
-## Intended use
-
-Use this model as the second stage of a retrieve-and-rerank workflow:
-
-1. Split or index legal documents.
-2. Use BM25 or embeddings to retrieve 30-100 candidate passages.
-3. Pass the query and candidates to this model.
-4. Send the highest-ranked evidence to a human reviewer or grounded generator.
-
-The model emits relevance scores. It does not search a corpus, answer legal
-questions, execute actions, or provide legal advice.
-
-## Usage
-
-```python
-from sentence_transformers import CrossEncoder
-
-model = CrossEncoder("{repository_id}")
-query = "When may either party terminate the agreement?"
-passages = [
-    "Either party may terminate this Agreement with thirty days written notice.",
-    "Confidential information must be protected for five years.",
-    "Invoices are payable within sixty days after receipt.",
-]
-
-ranked = model.rank(query, passages, return_documents=True)
-for result in ranked:
-    print(float(result["score"]), result["text"])
-```
-
-The output is a list ordered from the highest relevance logit to the lowest.
-Scores rank candidates for one query; they are not calibrated probabilities.
-
-{verification_section}
-
-## Data and leakage controls
-
-The pinned upstream [LegalBench-RAG release]({UPSTREAM_REPOSITORY}) contains
-{manifest["total_queries"]:,} questions, {manifest["total_documents"]:,}
-documents, and {manifest["evidence_spans"]:,} expert-annotated evidence spans.
-All spans were checked against the exact source substrings before training.
-
-| Domain | Queries | Documents |
-|---|---:|---:|
-| ContractNLI | {manifest["query_counts"]["contractnli"]:,} | {manifest["document_counts"]["contractnli"]:,} |
-| CUAD | {manifest["query_counts"]["cuad"]:,} | {manifest["document_counts"]["cuad"]:,} |
-| MAUD | {manifest["query_counts"]["maud"]:,} | {manifest["document_counts"]["maud"]:,} |
-| PrivacyQA | {manifest["query_counts"]["privacy_qa"]:,} | {manifest["document_counts"]["privacy_qa"]:,} |
-
-Documents—not individual questions—were assigned to train, validation, and
-test. Therefore questions about one contract cannot appear across splits. The
-published repository does not redistribute source contracts or passage text.
-
-## Schema transformation
-
-One upstream row contains a query and one or more exact evidence coordinates:
-
-```json
-{{
-  "query": "What law governs this agreement?",
-  "snippets": [{{
-    "file_path": "cuad/example.txt",
-    "span": [120, 184],
-    "answer": "This Agreement is governed by New York law."
-  }}]
-}}
-```
-
-Documents were converted into overlapping token-bounded passages. Each evidence
-span selected its highest-overlap passage as a positive. BM25 supplied four
-high-ranking non-overlapping passages from the same document as hard negatives:
-
-```json
-{{
-  "query": "What law governs this agreement?",
-  "passage": "This Agreement is governed by New York law.",
-  "label": 1.0
-}}
-```
-
-Evaluation reranks BM25's organic top-{EVALUATION_CANDIDATES}; missing positives
-are not inserted into the candidate list.
-
-## Model and objective
-
-This is a standalone cross-encoder, not an adapter. A query and passage attend
-to each other jointly and the model emits one logit. Binary cross-entropy with
-logits trains positives toward 1 and hard negatives toward 0. Every labeled
-pair contributes to the loss; float16 changes memory use and TensorBoard records
-progress, but neither changes the objective.
-
-| Configuration | Value |
-|---|---|
-| Base revision | `{BASE_MODEL_REVISION}` |
-| Parameters | {run_config["total_parameters"]:,} trainable / {run_config["total_parameters"]:,} total |
-| Epochs requested | {training["epochs_requested"]} |
-| Best checkpoint | `{training["best_checkpoint"]}` |
-| Pair length | {MAX_PAIR_TOKENS} tokens |
-| Passage window / overlap | {PASSAGE_TOKENS} / {PASSAGE_OVERLAP_TOKENS} tokens |
-| Batch / accumulation / effective batch | {TRAIN_BATCH_SIZE} / {GRADIENT_ACCUMULATION_STEPS} / {TRAIN_BATCH_SIZE * GRADIENT_ACCUMULATION_STEPS} |
-| Optimizer / schedule | AdamW / linear |
-| Learning rate / warmup | {LEARNING_RATE} / {WARMUP_RATIO:.0%} |
-| Precision | {run_config["precision"]} |
-| Hardware | {run_config["cuda_device"]} |
-| Observed training runtime | {training["runtime_seconds"] / 60:.1f} minutes |
-| Seed | {run_config["seed"]} |
-
-## Evaluation
-
-All systems use the same held-out documents and organic BM25 candidate lists.
-NDCG and MRR measure passage ordering; character precision/recall measure exact
-overlap with annotated source coordinates.
-
-| System | NDCG@10 | MRR@10 | Hit@5 | Char recall@5 |
-|---|---:|---:|---:|---:|
-| BM25 candidate order | {bm25["ndcg@10"]:.4f} | {bm25["mrr@10"]:.4f} | {bm25["hit@5"]:.4f} | {bm25["char_recall@5"]:.4f} |
-| Untouched Ettin | {base["ndcg@10"]:.4f} | {base["mrr@10"]:.4f} | {base["hit@5"]:.4f} | {base["char_recall@5"]:.4f} |
-| Fine-tuned model | {final["ndcg@10"]:.4f} | {final["mrr@10"]:.4f} | {final["hit@5"]:.4f} | {final["char_recall@5"]:.4f} |
-
-| Domain | Base NDCG@10 | Fine-tuned NDCG@10 | Delta |
-|---|---:|---:|---:|
-{domain_rows}
-
-## Limitations
-
-- English-only and concentrated on NDAs, commercial contracts, M&A agreements,
-  and consumer privacy policies.
-- A reranker cannot recover evidence that the first-stage retriever omitted.
-- The benchmark uses synthetic question templates around expert annotations;
-  ordinary user language may differ.
-- Relevance scores are not legal conclusions or calibrated confidence values.
-- Validate on your document types, jurisdictions, and retrieval candidate
-  distribution before operational use. Human legal review remains necessary.
-
-## Artifacts and reproduction
-
-The repository includes aggregate metrics, per-query rank coordinates without
-contract text, the resolved configuration, trainer state, package versions,
-and TensorBoard event files under `tensorboard/`.
-
-Training source:
-[`scripts/finetune_legalbenchrag_ettin_reranker.py`](https://github.com/LxYuan0420/nlp/blob/main/scripts/finetune_legalbenchrag_ettin_reranker.py)
-
-```bash
-uv run --script scripts/finetune_legalbenchrag_ettin_reranker.py
-```
-
-| Package | Tested version |
-|---|---|
-{package_rows}
-
-## Data attribution
-
-LegalBench-RAG builds on ContractNLI, CUAD, MAUD, and PrivacyQA. ContractNLI,
-CUAD, and MAUD are distributed under CC BY 4.0; consult every source dataset's
-terms and the upstream LegalBench-RAG repository before reuse. The model weights
-are released under Apache-2.0, matching the base checkpoint.
-"""
-
-    def _repository_id(self) -> str:
-        if not (self.config.publish or self.config.publish_only):
-            return f"YOUR_USERNAME/{MODEL_REPO_NAME}"
-        user = HfApi().whoami()["name"]
-        return f"{user}/{MODEL_REPO_NAME}"
-
-    @staticmethod
-    def _verification_section(verification: dict[str, Any] | None) -> str:
-        if verification is None:
-            return ""
-        rows = "\n".join(
-            "| {query} | {passage} | {score:.4f} |".format(
-                query=example["query"].replace("|", "\\|"),
-                passage=example["top_passage"].replace("|", "\\|"),
-                score=example["top_score"],
-            )
-            for example in verification["examples"]
-        )
-        return f"""## Verified examples
-
-These outputs were produced after reloading the published repository in a new
-`CrossEncoder` instance.
-
-| Query | Highest-ranked passage | Score |
-|---|---|---:|
-{rows}"""
-
-    @staticmethod
-    def _read_json(path: Path) -> dict[str, Any]:
-        return json.loads(path.read_text(encoding="utf-8"))
-
-
-class HubPublisher:
-    """Publish completed artifacts, reload remotely, and verify real inference."""
-
-    def __init__(self, config: ExperimentConfig) -> None:
-        self.config = config
-        self.api = HfApi()
-
-    def publish_and_verify(self) -> None:
-        output_dir = self.config.output_path
-        missing = [
-            name
-            for name in REQUIRED_LOCAL_ARTIFACTS
-            if not (output_dir / name).is_file()
-        ]
-        if missing:
-            raise FileNotFoundError(
-                f"Cannot publish; missing local artifacts: {missing}"
-            )
-        repository_id = f"{self.api.whoami()['name']}/{MODEL_REPO_NAME}"
-        self.api.create_repo(repository_id, repo_type="model", exist_ok=True)
-        self.api.upload_folder(
-            repo_id=repository_id,
-            repo_type="model",
-            folder_path=output_dir,
-            ignore_patterns=[
-                "checkpoints/**",
-                "baseline-eval/**",
-                "*.zip",
-                "*.download",
-            ],
-            commit_message="Publish full LegalBench-RAG reranker experiment",
-        )
-        remote_files = set(self.api.list_repo_files(repository_id, repo_type="model"))
-        missing_remote = [
-            name for name in REQUIRED_LOCAL_ARTIFACTS if name not in remote_files
-        ]
-        if missing_remote:
-            raise FileNotFoundError(f"Hub upload is incomplete: {missing_remote}")
-
-        remote_model = CrossEncoder(repository_id, max_length=MAX_PAIR_TOKENS)
-        examples = [
-            {
-                "query": "When may either party terminate the agreement?",
-                "passages": [
-                    "Either party may terminate with thirty days written notice.",
-                    "Invoices are due sixty days after receipt.",
-                    "Confidential material must be returned on request.",
-                ],
-                "expected_top": 0,
-            },
-            {
-                "query": "Which law governs the contract?",
-                "passages": [
-                    "The supplier shall maintain insurance coverage.",
-                    "This agreement is governed by the laws of New York.",
-                    "Notices must be delivered by registered mail.",
-                ],
-                "expected_top": 1,
-            },
-            {
-                "query": "How long do confidentiality obligations survive?",
-                "passages": [
-                    "Payment shall be made in United States dollars.",
-                    "Confidentiality obligations survive termination for five years.",
-                    "The agreement may be signed in counterparts.",
-                ],
-                "expected_top": 1,
-            },
-        ]
-        results = []
-        for example in examples:
-            ranked = remote_model.rank(
-                example["query"],
-                example["passages"],
-                return_documents=True,
-            )
-            top_index = int(ranked[0]["corpus_id"])
-            results.append(
-                {
-                    "query": example["query"],
-                    "expected_top": example["expected_top"],
-                    "actual_top": top_index,
-                    "top_score": float(ranked[0]["score"]),
-                    "top_passage": example["passages"][top_index],
-                    "passed": top_index == example["expected_top"],
-                }
-            )
-        if not all(result["passed"] for result in results):
-            raise AssertionError(f"Published usage verification failed: {results}")
-        verification_path = output_dir / "verification_results.json"
-        verification_path.write_text(
-            json.dumps({"repository_id": repository_id, "examples": results}, indent=2)
-            + "\n",
-            encoding="utf-8",
-        )
-        readme_path = ModelCardWriter(self.config).write()
-        self.api.upload_folder(
-            repo_id=repository_id,
-            repo_type="model",
-            folder_path=output_dir,
-            allow_patterns=["README.md", "verification_results.json"],
-            commit_message="Add verified inference examples",
-        )
-        if not readme_path.is_file():
-            raise FileNotFoundError(
-                "Model card regeneration did not produce README.md."
-            )
-        final_remote_files = set(
-            self.api.list_repo_files(repository_id, repo_type="model")
-        )
-        final_missing = [
-            name for name in REQUIRED_REMOTE_ARTIFACTS if name not in final_remote_files
-        ]
-        if final_missing:
-            raise FileNotFoundError(
-                f"Final Hub repository is incomplete: {final_missing}"
-            )
-        print(f"Published and verified https://huggingface.co/{repository_id}")
-
-
 def parse_args() -> ExperimentConfig:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, default=DEFAULT_OUTPUT_DIR)
@@ -1849,35 +1415,24 @@ def parse_args() -> ExperimentConfig:
     parser.add_argument("--validate-only", action="store_true")
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--smoke-run", action="store_true")
-    parser.add_argument("--publish-only", action="store_true")
-    parser.add_argument("--no-push-to-hub", action="store_true")
     args = parser.parse_args()
 
-    modes = sum(
-        (args.validate_only, args.prepare_only, args.smoke_run, args.publish_only)
-    )
+    modes = sum((args.validate_only, args.prepare_only, args.smoke_run))
     if modes > 1:
         parser.error(
-            "Choose only one of --validate-only, --prepare-only, --smoke-run, "
-            "or --publish-only."
+            "Choose only one of --validate-only, --prepare-only, or --smoke-run."
         )
     if args.epochs <= 0:
         parser.error("--epochs must be greater than zero.")
-    if args.publish_only and args.no_push_to_hub:
-        parser.error("--publish-only conflicts with --no-push-to-hub.")
 
     return ExperimentConfig(
         output_dir=str(args.output_dir),
         data_dir=str(args.data_dir),
         epochs=args.epochs,
         seed=args.seed,
-        publish=not args.no_push_to_hub
-        and not args.validate_only
-        and not args.prepare_only,
         validate_only=args.validate_only,
         prepare_only=args.prepare_only,
         smoke_run=args.smoke_run,
-        publish_only=args.publish_only,
     )
 
 
