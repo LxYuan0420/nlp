@@ -38,6 +38,12 @@ Run the complete full-data experiment:
 
     uv run --script scripts/finetune_legalbenchrag_ettin_reranker.py
 
+Resume an interrupted run from a checkpoint in the same output directory:
+
+    uv run --script scripts/finetune_legalbenchrag_ettin_reranker.py \
+        --output-dir /content/drive/MyDrive/legalbenchrag-ettin-150m-reranker \
+        --resume-from-checkpoint /content/drive/MyDrive/legalbenchrag-ettin-150m-reranker/checkpoints/checkpoint-928
+
 Validate the downloaded corpus and exact character spans without a GPU:
 
     uv run --script scripts/finetune_legalbenchrag_ettin_reranker.py \
@@ -221,6 +227,7 @@ class ExperimentConfig:
     data_dir: str
     epochs: float
     seed: int
+    resume_from_checkpoint: str | None
     validate_only: bool
     prepare_only: bool
     smoke_run: bool
@@ -232,6 +239,14 @@ class ExperimentConfig:
     @property
     def data_path(self) -> Path:
         return Path(self.data_dir)
+
+    @property
+    def resume_checkpoint_path(self) -> Path | None:
+        """Return the explicit trainer checkpoint directory, when resuming."""
+
+        if self.resume_from_checkpoint is None:
+            return None
+        return Path(self.resume_from_checkpoint)
 
 
 class LegalBenchRAGSource:
@@ -1166,20 +1181,16 @@ class LegalRerankerExperiment:
             f"{len(prepared.train_dataset):,} labeled pairs."
         )
 
-        bm25_metrics = self.metrics.evaluate_bm25(prepared.test_cases)
-        base_metrics, _ = self.metrics.evaluate_model(
-            model,
-            prepared.test_cases,
-            batch_size=EVAL_BATCH_SIZE,
+        bm25_metrics, base_metrics = self._load_or_measure_baselines(
+            model, prepared.test_cases
         )
-        baseline_metrics = {"bm25": bm25_metrics, "untouched_base_model": base_metrics}
-        self._write_json(output_dir / "baseline_metrics.json", baseline_metrics)
 
         validation_evaluator = self._sentence_transformers_evaluator(
             prepared.validation_cases,
             name="legalbenchrag-dev",
         )
-        validation_evaluator(model, output_path=str(output_dir / "baseline-eval"))
+        if self.config.resume_checkpoint_path is None:
+            validation_evaluator(model, output_path=str(output_dir / "baseline-eval"))
         training_args = self._training_arguments(validation_evaluator)
         trainer = CrossEncoderTrainer(
             model=model,
@@ -1201,7 +1212,12 @@ class LegalRerankerExperiment:
         )
 
         started_at = time.perf_counter()
-        train_result = trainer.train()
+        resume_checkpoint = self.config.resume_checkpoint_path
+        train_result = trainer.train(
+            resume_from_checkpoint=(
+                str(resume_checkpoint) if resume_checkpoint is not None else None
+            )
+        )
         runtime_seconds = time.perf_counter() - started_at
         trainer.save_state()
         model.save_pretrained(output_dir, create_model_card=False)
@@ -1229,6 +1245,68 @@ class LegalRerankerExperiment:
         )
         self._write_json(output_dir / "package_versions.json", self._package_versions())
         print(f"Training and evaluation artifacts saved to {output_dir.resolve()}")
+
+    def _load_or_measure_baselines(
+        self,
+        model: CrossEncoder,
+        test_cases: Sequence[EvaluationCase],
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        """Return BM25 and untouched-model test metrics for comparison.
+
+        Input:
+            ``model`` is the untouched base cross-encoder and ``test_cases`` is
+            the document-disjoint test split with organic BM25 candidates.
+            When ``--resume-from-checkpoint`` is set, ``baseline_metrics.json``
+            must already exist in the output directory; this prevents an
+            interrupted Colab run from repeating two expensive inference passes.
+
+        Output:
+            A ``(bm25_metrics, base_model_metrics)`` tuple. Each mapping contains
+            an ``overall`` metric mapping and a ``by_domain`` mapping, for example::
+
+                ({"overall": {"ndcg@10": 0.31}, "by_domain": {...}},
+                 {"overall": {"ndcg@10": 0.42}, "by_domain": {...}})
+        """
+
+        checkpoint = self.config.resume_checkpoint_path
+        baseline_path = self.config.output_path / "baseline_metrics.json"
+        if checkpoint is not None:
+            if not checkpoint.is_dir():
+                raise FileNotFoundError(
+                    f"Resume checkpoint directory does not exist: {checkpoint}"
+                )
+            trainer_state_path = checkpoint / "trainer_state.json"
+            if not trainer_state_path.is_file():
+                raise FileNotFoundError(
+                    f"Resume checkpoint is missing trainer_state.json: {checkpoint}"
+                )
+            if not baseline_path.is_file():
+                raise FileNotFoundError(
+                    "An explicit resume requires baseline_metrics.json in the "
+                    f"output directory: {baseline_path}"
+                )
+            payload = json.loads(baseline_path.read_text(encoding="utf-8"))
+            try:
+                bm25_metrics = payload["bm25"]
+                base_metrics = payload["untouched_base_model"]
+            except (KeyError, TypeError) as error:
+                raise ValueError(
+                    f"Malformed baseline metrics file: {baseline_path}"
+                ) from error
+            print(f"Reusing baseline metrics from {baseline_path}")
+            return bm25_metrics, base_metrics
+
+        bm25_metrics = self.metrics.evaluate_bm25(test_cases)
+        base_metrics, _ = self.metrics.evaluate_model(
+            model,
+            test_cases,
+            batch_size=EVAL_BATCH_SIZE,
+        )
+        self._write_json(
+            baseline_path,
+            {"bm25": bm25_metrics, "untouched_base_model": base_metrics},
+        )
+        return bm25_metrics, base_metrics
 
     def _load_model(self) -> CrossEncoder:
         return CrossEncoder(
@@ -1410,6 +1488,14 @@ def parse_args() -> ExperimentConfig:
     parser.add_argument("--data-dir", type=Path, default=DATA_CACHE_DIR)
     parser.add_argument("--epochs", type=float, default=DEFAULT_EPOCHS)
     parser.add_argument("--seed", type=int, default=DEFAULT_SEED)
+    parser.add_argument(
+        "--resume-from-checkpoint",
+        type=Path,
+        help=(
+            "Resume Trainer state from an existing checkpoint. The matching "
+            "output directory must also contain baseline_metrics.json."
+        ),
+    )
     parser.add_argument("--validate-only", action="store_true")
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--smoke-run", action="store_true")
@@ -1428,6 +1514,11 @@ def parse_args() -> ExperimentConfig:
         data_dir=str(args.data_dir),
         epochs=args.epochs,
         seed=args.seed,
+        resume_from_checkpoint=(
+            str(args.resume_from_checkpoint)
+            if args.resume_from_checkpoint is not None
+            else None
+        ),
         validate_only=args.validate_only,
         prepare_only=args.prepare_only,
         smoke_run=args.smoke_run,
