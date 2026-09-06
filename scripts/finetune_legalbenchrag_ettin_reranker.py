@@ -44,12 +44,6 @@ Resume an interrupted run from a checkpoint in the same output directory:
         --output-dir /content/drive/MyDrive/legalbenchrag-ettin-150m-reranker \
         --resume-from-checkpoint /content/drive/MyDrive/legalbenchrag-ettin-150m-reranker/checkpoints/checkpoint-928
 
-Reuse an already measured baseline in the output directory after an interrupted
-runtime, without claiming that it came from the new training process:
-
-    uv run --script scripts/finetune_legalbenchrag_ettin_reranker.py \
-        --reuse-baseline-metrics
-
 Validate the downloaded corpus and exact character spans without a GPU:
 
     uv run --script scripts/finetune_legalbenchrag_ettin_reranker.py \
@@ -236,7 +230,6 @@ class ExperimentConfig:
     epochs: float
     seed: int
     resume_from_checkpoint: str | None
-    reuse_baseline_metrics: bool
     validate_only: bool
     prepare_only: bool
     smoke_run: bool
@@ -1198,7 +1191,7 @@ class LegalRerankerExperiment:
             prepared.validation_cases,
             name=VALIDATION_EVALUATOR_NAME,
         )
-        if not self.config.reuse_baseline_metrics:
+        if self.config.resume_checkpoint_path is None:
             validation_evaluator(model, output_path=str(output_dir / "baseline-eval"))
         training_args = self._training_arguments()
         trainer = CrossEncoderTrainer(
@@ -1279,17 +1272,16 @@ class LegalRerankerExperiment:
 
         checkpoint = self.config.resume_checkpoint_path
         baseline_path = self.config.output_path / "baseline_metrics.json"
-        if checkpoint is not None or self.config.reuse_baseline_metrics:
-            if checkpoint is not None:
-                if not checkpoint.is_dir():
-                    raise FileNotFoundError(
-                        f"Resume checkpoint directory does not exist: {checkpoint}"
-                    )
-                trainer_state_path = checkpoint / "trainer_state.json"
-                if not trainer_state_path.is_file():
-                    raise FileNotFoundError(
-                        f"Resume checkpoint is missing trainer_state.json: {checkpoint}"
-                    )
+        if checkpoint is not None:
+            if not checkpoint.is_dir():
+                raise FileNotFoundError(
+                    f"Resume checkpoint directory does not exist: {checkpoint}"
+                )
+            trainer_state_path = checkpoint / "trainer_state.json"
+            if not trainer_state_path.is_file():
+                raise FileNotFoundError(
+                    f"Resume checkpoint is missing trainer_state.json: {checkpoint}"
+                )
             if not baseline_path.is_file():
                 raise FileNotFoundError(
                     "An explicit resume requires baseline_metrics.json in the "
@@ -1503,15 +1495,6 @@ def parse_args() -> ExperimentConfig:
             "output directory must also contain baseline_metrics.json."
         ),
     )
-    parser.add_argument(
-        "--reuse-baseline-metrics",
-        action="store_true",
-        help=(
-            "Reuse baseline_metrics.json already present in --output-dir. "
-            "Intended for restarting the same pinned experiment after a "
-            "reclaimable runtime interruption."
-        ),
-    )
     parser.add_argument("--validate-only", action="store_true")
     parser.add_argument("--prepare-only", action="store_true")
     parser.add_argument("--smoke-run", action="store_true")
@@ -1534,9 +1517,6 @@ def parse_args() -> ExperimentConfig:
             str(args.resume_from_checkpoint)
             if args.resume_from_checkpoint is not None
             else None
-        ),
-        reuse_baseline_metrics=(
-            args.reuse_baseline_metrics or args.resume_from_checkpoint is not None
         ),
         validate_only=args.validate_only,
         prepare_only=args.prepare_only,
