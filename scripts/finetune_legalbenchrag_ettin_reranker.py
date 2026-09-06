@@ -1261,12 +1261,11 @@ class LegalRerankerExperiment:
             HubPublisher(self.config).publish_and_verify()
 
     def _load_model(self) -> CrossEncoder:
-        dtype = torch.float16 if torch.cuda.is_available() else torch.float32
         return CrossEncoder(
             BASE_MODEL_ID,
             revision=BASE_MODEL_REVISION,
             max_length=MAX_PAIR_TOKENS,
-            model_kwargs={"dtype": dtype, "attn_implementation": "sdpa"},
+            model_kwargs={"dtype": torch.float32, "attn_implementation": "sdpa"},
         )
 
     def _training_arguments(
