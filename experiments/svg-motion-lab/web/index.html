@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="A still drawing, a sentence, and a small model learning to move. Explore four before-and-after SVG animations.">
+<meta name="theme-color" content="#dedfc5">
+<title>SVG Motion Lab — Still, until you say otherwise.</title>
+<link rel="stylesheet" href="style.css">
+<script src="app.js" defer></script>
+</head>
+<body>
+<header class="masthead wrap">
+  <a href="#" class="wordmark" aria-label="SVG Motion Lab home"><span class="motion-mark" aria-hidden="true">∿</span> svg motion lab</a>
+  <nav aria-label="Main navigation"><a href="#story">The idea</a><a href="https://github.com/LxYuan0420/nlp/tree/main/experiments/svg-motion-lab">Source</a><a href="https://huggingface.co/lxyuan/SVG-Motion-Qwen3.5-0.8B-LoRA">Model</a></nav>
+</header>
+<main>
+  <section class="intro wrap" aria-labelledby="headline">
+    <div><p class="eyebrow">A small experiment in teaching motion</p><h1 id="headline">Still, until you<br>say <em>otherwise.</em></h1></div>
+    <div class="intro-copy"><p>A drawing knows how to sit still.<br>Can a model learn to make it move?</p><p>Start with a simple SVG and a sentence. Give both to the original model, then to the same model taught motion. See what changes.</p><a class="text-link" href="#playground">Watch it happen</a></div>
+  </section>
+  <section class="playground wrap" id="playground" aria-label="Animation comparison">
+    <div class="section-top"><h2>Four little directions.</h2><p>Choose a scene. Watch both takes.</p></div>
+    <div id="scenes" class="scenes" role="group" aria-label="Choose a scene"></div>
+    <div class="theatre">
+      <div class="direction"><span class="eyebrow">The direction</span><p id="direction"></p></div>
+      <div class="comparison">
+        <section class="take" aria-labelledby="base-label"><div class="take-heading"><h3 id="base-label">Original model</h3><span>Before</span></div><div id="base-view" class="canvas"></div></section>
+        <section class="take" aria-labelledby="finetuned-label"><div class="take-heading"><h3 id="finetuned-label">Taught motion</h3><span>After</span></div><div id="finetuned-view" class="canvas"></div></section>
+      </div>
+      <div class="transport"><div class="buttons"><button id="replay" class="replay" type="button">Replay both</button><button id="pause" class="pause" type="button" disabled>Pause</button></div><div class="scrubber"><label class="sr-only" for="timeline">Animation position</label><input id="timeline" type="range" min="0" max="1000" value="0" aria-valuetext="0 seconds"><output id="time" for="timeline">0.0 s</output></div></div>
+    </div>
+    <div class="scene-note"><p id="watch" aria-live="polite"></p><p class="replay-note">Recorded model outputs. No live generation.</p></div>
+  </section>
+  <section class="story wrap" id="story" aria-labelledby="story-title">
+    <div><p class="eyebrow">The idea</p><h2 id="story-title">Same drawing.<br>Same direction.<br><em>A different response.</em></h2></div>
+    <div class="story-copy"><p>The model reads a vector drawing’s code and a direction, then writes the code that makes it move.</p><p>I taught a small open model a handful of motions: rise, turn, grow and fade. The scenes above show how that changes its response to the same input.</p><p>Both takes use the same drawing and original prompt. The directions above are shortened for readability. These four scenes are selected from the recorded results; the complete experiment is open to explore.</p><a class="text-link" href="https://github.com/LxYuan0420/nlp/tree/main/experiments/svg-motion-lab">Explore the experiment</a></div>
+  </section>
+</main>
+<footer class="wrap"><span>An experiment by Yuan Lik Xun</span><div><a href="https://huggingface.co/datasets/lxyuan/svg-motion-lab">Data</a><a href="https://huggingface.co/lxyuan/SVG-Motion-Qwen3.5-0.8B-LoRA/tree/main/evidence">Full results</a><a href="comparison.mp4">Watch the film</a></div></footer>
+<script id="examples" type="application/json">__EXAMPLES__</script>
+</body>
+</html>

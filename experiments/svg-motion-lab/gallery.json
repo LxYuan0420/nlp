@@ -1,0 +1,6 @@
+[
+  {"id":"test-0016","title":"A fish takes a turn","direction":"Turn the fish a quarter-turn clockwise and let it grow. Hold for a beat, then return. Repeat every three seconds.","watch":"Watch the turn and the change in size happen together."},
+  {"id":"test-0000","title":"A little lift-off","direction":"Let the satellite rise and fade. Pause at the top, then bring it back. Repeat every three seconds.","watch":"Watch the satellite lift as its colour fades, then return to where it started."},
+  {"id":"test-0002","title":"The fading lantern","direction":"Lift the lantern until it is almost a ghost. Hold it there, then bring back its colour and position. Repeat every three seconds.","watch":"Watch the lantern become faint as it rises. The drawing itself stays the same."},
+  {"id":"test-0009","title":"A satellite pirouette","direction":"Give the satellite a half-turn and make it bigger. Pause, then unwind. Repeat every four seconds.","watch":"Watch rotation and growth combine into one looping movement."}
+]

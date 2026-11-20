@@ -1,0 +1,14 @@
+__pycache__/
+.venv/
+data/
+outputs/
+*.log
+output/
+demo-smoke/
+preflight.py
+prepare_remote.py
+status_remote.py
+inspect_remote.py
+restart_smoke.py
+start_full.py
+check_release_remote.py

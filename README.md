@@ -1,5 +1,9 @@
 ### NLP Thingy
 
+#### [Experiments]
+
+- [SVG Motion Lab](experiments/svg-motion-lab) — teach a small model to animate an SVG from a text instruction. [Watch the before-and-after demo](https://huggingface.co/spaces/lxyuan/svg-motion-lab) · [Model](https://huggingface.co/lxyuan/SVG-Motion-Qwen3.5-0.8B-LoRA) · [Dataset](https://huggingface.co/datasets/lxyuan/svg-motion-lab).
+
 
 #### [Tensorflow]
 - [IMDb Review Classification using CNN Tensorflow](notebooks/IMDb_Review_Classification_using_CNN_Tensorflow.ipynb)

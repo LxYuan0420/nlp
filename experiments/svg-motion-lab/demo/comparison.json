@@ -1,0 +1,154 @@
+[
+  {
+    "id": "test-0016",
+    "title": "A fish takes a turn",
+    "direction": "Turn the fish a quarter-turn clockwise and let it grow. Hold for a beat, then return. Repeat every three seconds.",
+    "watch": "Watch the turn and the change in size happen together.",
+    "family": "fish",
+    "instruction": "Preserve the drawing and its initial placement. Apply these motions simultaneously: rotate clockwise by 90 degrees around its own origin during the first 40% of a 3-second cycle, hold until 60%, then return to the original state by the end; repeat forever; and scale uniformly to 1.6 times its original size around its own origin during the first 40% of a 3-second cycle, hold until 60%, then return to the original state by the end; repeat forever. Return only the complete animated SVG, without scripts, CSS, external resources, or Markdown. Use native SVG animations.",
+    "input_svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-rotate\"><g id=\"motion-scale\"><g id=\"drawing\" fill=\"#38bdf8\"><path d=\"M-19 0 Q0 -24 19 0 Q0 24 -19 0 L-28 -12 V12Z\"/><circle cx=\"10\" cy=\"-3\" r=\"3\" fill=\"white\"/></g></g></g></g></svg>",
+    "duration": 3,
+    "base": {
+      "id": "test-0016",
+      "prediction": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-rotate\"><g id=\"motion-scale\"><g id=\"drawing\" fill=\"#38bdf8\"><path d=\"M-19 0 Q0 -24 19 0 Q0 24 -19 0 L-28 -12 V12Z\"/><circle cx=\"10\" cy=\"-3\" r=\"3\" fill=\"white\"/></g></g></g></g></svg>",
+      "score": {
+        "valid": true,
+        "preserves_drawing": true,
+        "motion_pass": false,
+        "reason": "Motion differs at cycle fraction 0.13"
+      },
+      "batch_seconds": 10.607814239000163,
+      "batch_size": 4,
+      "renderable": true,
+      "render_source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-rotate\"><g id=\"motion-scale\"><g id=\"drawing\" fill=\"#38bdf8\"><path d=\"M-19 0 Q0 -24 19 0 Q0 24 -19 0 L-28 -12 V12Z\" /><circle cx=\"10\" cy=\"-3\" r=\"3\" fill=\"white\" /></g></g></g></g></svg>"
+    },
+    "finetuned": {
+      "id": "test-0016",
+      "prediction": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-rotate\"><animateTransform attributeName=\"transform\" type=\"rotate\" values=\"0;90;90;0\" dur=\"3s\" keyTimes=\"0;0.4;0.6;1\" repeatCount=\"indefinite\"/><g id=\"motion-scale\"><animateTransform attributeName=\"transform\" type=\"scale\" values=\"1;1.6;1.6;1\" dur=\"3s\" keyTimes=\"0;0.4;0.6;1\" repeatCount=\"indefinite\"/><g id=\"drawing\" fill=\"#38bdf8\"><path d=\"M-19 0 Q0 -24 19 0 Q0 24 -19 0 L-28 -12 V12Z\"/><circle cx=\"10\" cy=\"-3\" r=\"3\" fill=\"white\"/></g></g></g></g></svg>",
+      "score": {
+        "valid": true,
+        "preserves_drawing": true,
+        "motion_pass": true,
+        "reason": "Passed every sampled motion check"
+      },
+      "batch_seconds": 25.382535663,
+      "batch_size": 4,
+      "renderable": true,
+      "render_source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-rotate\"><animateTransform attributeName=\"transform\" type=\"rotate\" values=\"0;90;90;0\" dur=\"3s\" keyTimes=\"0;0.4;0.6;1\" repeatCount=\"indefinite\" /><g id=\"motion-scale\"><animateTransform attributeName=\"transform\" type=\"scale\" values=\"1;1.6;1.6;1\" dur=\"3s\" keyTimes=\"0;0.4;0.6;1\" repeatCount=\"indefinite\" /><g id=\"drawing\" fill=\"#38bdf8\"><path d=\"M-19 0 Q0 -24 19 0 Q0 24 -19 0 L-28 -12 V12Z\" /><circle cx=\"10\" cy=\"-3\" r=\"3\" fill=\"white\" /></g></g></g></g></svg>"
+    }
+  },
+  {
+    "id": "test-0000",
+    "title": "A little lift-off",
+    "direction": "Let the satellite rise and fade. Pause at the top, then bring it back. Repeat every three seconds.",
+    "watch": "Watch the satellite lift as its colour fades, then return to where it started.",
+    "family": "satellite",
+    "instruction": "Preserve the drawing and its initial placement. Apply these motions simultaneously: move upward by 63 SVG units during the first 40% of a 3-second cycle, hold until 60%, then return to the original state by the end; repeat forever; and fade to opacity 0.3 during the first 40% of a 3-second cycle, hold until 60%, then return to the original state by the end; repeat forever. Return only the complete animated SVG, without scripts, CSS, external resources, or Markdown. Use native SVG animations.",
+    "input_svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-translate\"><g id=\"motion-opacity\"><g id=\"drawing\" fill=\"#f97316\"><rect x=\"-8\" y=\"-12\" width=\"16\" height=\"24\"/><path d=\"M-25 -9 H-11 V9 H-25Z M11 -9 H25 V9 H11Z\"/></g></g></g></g></svg>",
+    "duration": 3,
+    "base": {
+      "id": "test-0000",
+      "prediction": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-translate\"><g id=\"motion-opacity\"><g id=\"drawing\" fill=\"#f97316\"><rect x=\"-8\" y=\"-12\" width=\"16\" height=\"24\"/><path d=\"M-25 -9 H-11 V9 H-25Z M11 -9 H25 V9 H11Z\"/></g></g></g></g></svg>",
+      "score": {
+        "valid": true,
+        "preserves_drawing": true,
+        "motion_pass": false,
+        "reason": "Motion differs at cycle fraction 0.13"
+      },
+      "batch_seconds": 9.672158597999896,
+      "batch_size": 4,
+      "renderable": true,
+      "render_source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-translate\"><g id=\"motion-opacity\"><g id=\"drawing\" fill=\"#f97316\"><rect x=\"-8\" y=\"-12\" width=\"16\" height=\"24\" /><path d=\"M-25 -9 H-11 V9 H-25Z M11 -9 H25 V9 H11Z\" /></g></g></g></g></svg>"
+    },
+    "finetuned": {
+      "id": "test-0000",
+      "prediction": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-translate\"><animateTransform attributeName=\"transform\" type=\"translate\" values=\"0 0;0 -63;0 -63;0 0\" dur=\"3s\" keyTimes=\"0;0.4;0.6;1\" repeatCount=\"indefinite\"/><g id=\"motion-opacity\"><animate attributeName=\"opacity\" values=\"1;0.3;0.3;1\" dur=\"3s\" keyTimes=\"0;0.4;0.6;1\" repeatCount=\"indefinite\"/><g id=\"drawing\" fill=\"#f97316\"><rect x=\"-8\" y=\"-12\" width=\"16\" height=\"24\"/><path d=\"M-25 -9 H-11 V9 H-25Z M11 -9 H25 V9 H11Z\"/></g></g></g></g></svg>",
+      "score": {
+        "valid": true,
+        "preserves_drawing": true,
+        "motion_pass": true,
+        "reason": "Passed every sampled motion check"
+      },
+      "batch_seconds": 25.5612034589999,
+      "batch_size": 4,
+      "renderable": true,
+      "render_source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-translate\"><animateTransform attributeName=\"transform\" type=\"translate\" values=\"0 0;0 -63;0 -63;0 0\" dur=\"3s\" keyTimes=\"0;0.4;0.6;1\" repeatCount=\"indefinite\" /><g id=\"motion-opacity\"><animate attributeName=\"opacity\" values=\"1;0.3;0.3;1\" dur=\"3s\" keyTimes=\"0;0.4;0.6;1\" repeatCount=\"indefinite\" /><g id=\"drawing\" fill=\"#f97316\"><rect x=\"-8\" y=\"-12\" width=\"16\" height=\"24\" /><path d=\"M-25 -9 H-11 V9 H-25Z M11 -9 H25 V9 H11Z\" /></g></g></g></g></svg>"
+    }
+  },
+  {
+    "id": "test-0002",
+    "title": "The fading lantern",
+    "direction": "Lift the lantern until it is almost a ghost. Hold it there, then bring back its colour and position. Repeat every three seconds.",
+    "watch": "Watch the lantern become faint as it rises. The drawing itself stays the same.",
+    "family": "lantern",
+    "instruction": "Preserve the drawing and its initial placement. Apply these motions simultaneously: move upward by 39 SVG units during the first 40% of a 3-second cycle, hold until 60%, then return to the original state by the end; repeat forever; and fade to opacity 0.15 during the first 40% of a 3-second cycle, hold until 60%, then return to the original state by the end; repeat forever. Return only the complete animated SVG, without scripts, CSS, external resources, or Markdown. Use native SVG animations.",
+    "input_svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-translate\"><g id=\"motion-opacity\"><g id=\"drawing\" fill=\"#38bdf8\"><path d=\"M-14 -18 H14 L19 12 10 21 H-10 L-19 12Z\"/><path d=\"M-6 -18 V-26 H6 V-18\" fill=\"none\" stroke=\"white\"/></g></g></g></g></svg>",
+    "duration": 3,
+    "base": {
+      "id": "test-0002",
+      "prediction": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-translate\"><g id=\"motion-opacity\"><g id=\"drawing\" fill=\"#38bdf8\"><path d=\"M-14 -18 H14 L19 12 10 21 H-10 L-19 12Z\"/><path d=\"M-6 -18 V-26 H6 V-18\" fill=\"none\" stroke=\"white\"/></g></g></g></g></svg>",
+      "score": {
+        "valid": true,
+        "preserves_drawing": true,
+        "motion_pass": false,
+        "reason": "Motion differs at cycle fraction 0.13"
+      },
+      "batch_seconds": 9.672158597999896,
+      "batch_size": 4,
+      "renderable": true,
+      "render_source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-translate\"><g id=\"motion-opacity\"><g id=\"drawing\" fill=\"#38bdf8\"><path d=\"M-14 -18 H14 L19 12 10 21 H-10 L-19 12Z\" /><path d=\"M-6 -18 V-26 H6 V-18\" fill=\"none\" stroke=\"white\" /></g></g></g></g></svg>"
+    },
+    "finetuned": {
+      "id": "test-0002",
+      "prediction": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-translate\"><animateTransform attributeName=\"transform\" type=\"translate\" values=\"0 0;0 -39;0 -39;0 0\" dur=\"3s\" keyTimes=\"0;0.4;0.6;1\" repeatCount=\"indefinite\"/><g id=\"motion-opacity\"><animate attributeName=\"opacity\" values=\"1;0.15;0.15;1\" dur=\"3s\" keyTimes=\"0;0.4;0.6;1\" repeatCount=\"indefinite\"/><g id=\"drawing\" fill=\"#38bdf8\"><path d=\"M-14 -18 H14 L19 12 10 21 H-10 L-19 12Z\"/><path d=\"M-6 -18 V-26 H6 V-18\" fill=\"none\" stroke=\"white\"/></g></g></g></g></svg>",
+      "score": {
+        "valid": true,
+        "preserves_drawing": true,
+        "motion_pass": true,
+        "reason": "Passed every sampled motion check"
+      },
+      "batch_seconds": 25.5612034589999,
+      "batch_size": 4,
+      "renderable": true,
+      "render_source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-translate\"><animateTransform attributeName=\"transform\" type=\"translate\" values=\"0 0;0 -39;0 -39;0 0\" dur=\"3s\" keyTimes=\"0;0.4;0.6;1\" repeatCount=\"indefinite\" /><g id=\"motion-opacity\"><animate attributeName=\"opacity\" values=\"1;0.15;0.15;1\" dur=\"3s\" keyTimes=\"0;0.4;0.6;1\" repeatCount=\"indefinite\" /><g id=\"drawing\" fill=\"#38bdf8\"><path d=\"M-14 -18 H14 L19 12 10 21 H-10 L-19 12Z\" /><path d=\"M-6 -18 V-26 H6 V-18\" fill=\"none\" stroke=\"white\" /></g></g></g></g></svg>"
+    }
+  },
+  {
+    "id": "test-0009",
+    "title": "A satellite pirouette",
+    "direction": "Give the satellite a half-turn and make it bigger. Pause, then unwind. Repeat every four seconds.",
+    "watch": "Watch rotation and growth combine into one looping movement.",
+    "family": "satellite",
+    "instruction": "Preserve the drawing and its initial placement. Apply these motions simultaneously: rotate clockwise by 180 degrees around its own origin during the first 40% of a 4-second cycle, hold until 60%, then return to the original state by the end; repeat forever; and scale uniformly to 1.6 times its original size around its own origin during the first 40% of a 4-second cycle, hold until 60%, then return to the original state by the end; repeat forever. Return only the complete animated SVG, without scripts, CSS, external resources, or Markdown. Use native SVG animations.",
+    "input_svg": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-rotate\"><g id=\"motion-scale\"><g id=\"drawing\" fill=\"#38bdf8\"><rect x=\"-8\" y=\"-12\" width=\"16\" height=\"24\"/><path d=\"M-25 -9 H-11 V9 H-25Z M11 -9 H25 V9 H11Z\"/></g></g></g></g></svg>",
+    "duration": 4,
+    "base": {
+      "id": "test-0009",
+      "prediction": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-rotate\"><g id=\"motion-scale\"><g id=\"drawing\" fill=\"#38bdf8\"><rect x=\"-8\" y=\"-12\" width=\"16\" height=\"24\"/><path d=\"M-25 -9 H-11 V9 H-25Z M11 -9 H25 V9 H11Z\"/></g></g></g></g></svg>",
+      "score": {
+        "valid": true,
+        "preserves_drawing": true,
+        "motion_pass": false,
+        "reason": "Motion differs at cycle fraction 0.13"
+      },
+      "batch_seconds": 9.251102890000084,
+      "batch_size": 4,
+      "renderable": true,
+      "render_source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-rotate\"><g id=\"motion-scale\"><g id=\"drawing\" fill=\"#38bdf8\"><rect x=\"-8\" y=\"-12\" width=\"16\" height=\"24\" /><path d=\"M-25 -9 H-11 V9 H-25Z M11 -9 H25 V9 H11Z\" /></g></g></g></g></svg>"
+    },
+    "finetuned": {
+      "id": "test-0009",
+      "prediction": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-rotate\"><animateTransform attributeName=\"transform\" type=\"rotate\" values=\"0;180;180;0\" dur=\"4s\" keyTimes=\"0;0.4;0.6;1\" repeatCount=\"indefinite\"/><g id=\"motion-scale\"><animateTransform attributeName=\"transform\" type=\"scale\" values=\"1;1.6;1.6;1\" dur=\"4s\" keyTimes=\"0;0.4;0.6;1\" repeatCount=\"indefinite\"/><g id=\"drawing\" fill=\"#38bdf8\"><rect x=\"-8\" y=\"-12\" width=\"16\" height=\"24\"/><path d=\"M-25 -9 H-11 V9 H-25Z M11 -9 H25 V9 H11Z\"/></g></g></g></g></svg>",
+      "score": {
+        "valid": true,
+        "preserves_drawing": true,
+        "motion_pass": true,
+        "reason": "Passed every sampled motion check"
+      },
+      "batch_seconds": 25.539759032999882,
+      "batch_size": 4,
+      "renderable": true,
+      "render_source": "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 256 256\"><g id=\"position\" transform=\"translate(128 154)\"><g id=\"motion-rotate\"><animateTransform attributeName=\"transform\" type=\"rotate\" values=\"0;180;180;0\" dur=\"4s\" keyTimes=\"0;0.4;0.6;1\" repeatCount=\"indefinite\" /><g id=\"motion-scale\"><animateTransform attributeName=\"transform\" type=\"scale\" values=\"1;1.6;1.6;1\" dur=\"4s\" keyTimes=\"0;0.4;0.6;1\" repeatCount=\"indefinite\" /><g id=\"drawing\" fill=\"#38bdf8\"><rect x=\"-8\" y=\"-12\" width=\"16\" height=\"24\" /><path d=\"M-25 -9 H-11 V9 H-25Z M11 -9 H25 V9 H11Z\" /></g></g></g></g></svg>"
+    }
+  }
+]
